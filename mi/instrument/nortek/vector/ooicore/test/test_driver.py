@@ -18,11 +18,13 @@ USAGE:
        $ bin/nosetests -s -v /Users/Bill/WorkSpace/marine-integrations/mi/instrument/nortek/vector/ooicore -a INT
        $ bin/nosetests -s -v /Users/Bill/WorkSpace/marine-integrations/mi/instrument/nortek/vector/ooicore -a QUAL
 """
-__author__ = 'Bill Bollenbacher'
+__author__ = 'Rachel Manoni, Ronald Ronquillo'
 __license__ = 'Apache 2.0'
 
 from gevent import monkey
 monkey.patch_all()
+import gevent
+
 import time
 import ntplib
 
@@ -33,16 +35,17 @@ log = get_logger()
 
 from mi.idk.unit_test import InstrumentDriverTestCase, ParameterTestConfigKey
 
-from mi.instrument.nortek.test.test_driver import NortekUnitTest, NortekIntTest, NortekQualTest, DriverTestMixinSub
+from mi.instrument.nortek.test.test_driver import NortekUnitTest, NortekIntTest, NortekQualTest, DriverTestMixinSub, \
+    user_config2
 
-from mi.core.instrument.instrument_driver import DriverConfigKey
+from mi.core.instrument.instrument_driver import DriverConfigKey, DriverEvent, ResourceAgentState
 
 from mi.core.instrument.data_particle import DataParticleKey, DataParticleValue
 from mi.core.instrument.chunker import StringChunker
 
 from mi.core.exceptions import SampleException
 
-from mi.instrument.nortek.driver import ProtocolState, TIMEOUT, Capability, Parameter, ProtocolEvent
+from mi.instrument.nortek.driver import ProtocolState, TIMEOUT, Parameter, NEWLINE, ProtocolEvent
 
 from mi.instrument.nortek.vector.ooicore.driver import Protocol, DataParticleType, NortekDataParticleType
 from mi.instrument.nortek.vector.ooicore.driver import VectorVelocityHeaderDataParticle
@@ -61,7 +64,7 @@ InstrumentDriverTestCase.initialize(
 
     instrument_agent_resource_id='nortek_vector_dw_ooicore',
     instrument_agent_name='nortek_vector_dw_ooicore_agent',
-    instrument_agent_packet_config=NortekDataParticleType(),
+    instrument_agent_packet_config=DataParticleType(),
     driver_startup_config={
         DriverConfigKey.PARAMETERS: {
             Parameter.DEPLOYMENT_NAME: 'test',
@@ -417,11 +420,10 @@ class IntFromIDK(NortekIntTest, VectorDriverTestMixinSub):
         3. verify the particle coming in
         """
         self.assert_initialize_driver(ProtocolState.COMMAND)
-        # test acquire sample
+
         self.assert_driver_command(ProtocolEvent.ACQUIRE_SAMPLE, state=ProtocolState.COMMAND, delay=1)
         self.assert_async_particle_generation(DataParticleType.VELOCITY, self.assert_particle_sample, timeout=TIMEOUT)
 
-    # @unittest.skip('temp disable')
     def test_command_autosample(self):
         """
         Test autosample command and events.
@@ -451,7 +453,7 @@ class IntFromIDK(NortekIntTest, VectorDriverTestMixinSub):
 @attr('QUAL', group='mi')
 class QualFromIDK(NortekQualTest, VectorDriverTestMixinSub):
 
-    def test_direct_access_telnet_mode_driver(self):
+    def test_direct_access_telnet_mode(self):
         """
         This test manually tests that the Instrument Driver properly supports direct access to the
         physical instrument. (telnet mode)
@@ -459,26 +461,58 @@ class QualFromIDK(NortekQualTest, VectorDriverTestMixinSub):
         self.assert_direct_access_start_telnet()
         self.assertTrue(self.tcp_client)
         log.debug('finished set up')
+
         self.tcp_client.send_data("K1W%!Q")
         result = self.tcp_client.expect("VECTOR")
-
         self.assertTrue(result)
 
+        log.debug("DA Server Started.  Reading battery voltage")
+        self.tcp_client.send_data("BV")
+        self.tcp_client.expect("\x06\x06")
+
+        self.tcp_client.send_data("CC" + user_config2())
+        self.tcp_client.expect("\x06\x06")
+
         self.assert_direct_access_stop_telnet()
+
+        #verify the setting got restored.
+        self.assert_state_change(ResourceAgentState.COMMAND, ProtocolState.COMMAND, 10)
+        self.assert_get_parameter(Parameter.DIAGNOSTIC_INTERVAL, 10800)
+
+        # Test direct access inactivity timeout
+        self.assert_direct_access_start_telnet(inactivity_timeout=30, session_timeout=90)
+        self.assert_state_change(ResourceAgentState.COMMAND, ProtocolState.COMMAND, 60)
+
+        # Test session timeout without activity
+        self.assert_direct_access_start_telnet(inactivity_timeout=120, session_timeout=30)
+        self.assert_state_change(ResourceAgentState.COMMAND, ProtocolState.COMMAND, 60)
+
+        # Test direct access session timeout with activity
+        self.assert_direct_access_start_telnet(inactivity_timeout=30, session_timeout=60)
+        # Send some activity every 30 seconds to keep DA alive.
+        for i in range(1, 2, 3):
+            self.tcp_client.send_data(NEWLINE)
+            log.debug("Sending a little keep alive communication, sleeping for 15 seconds")
+            gevent.sleep(15)
+
+        self.assert_state_change(ResourceAgentState.COMMAND, ProtocolState.COMMAND, 45)
 
     def test_poll(self):
         """
         Verify data particles for a single sample that are specific to Vector
         """
-        self.assert_sample_polled(self.assert_particle_velocity, DataParticleType.VELOCITY_HEADER, timeout=10)
-        self.assert_sample_polled(self.assert_particle_sample, DataParticleType.VELOCITY, timeout=10)
-        self.assert_sample_polled(self.assert_particle_system, DataParticleType.SYSTEM, timeout=60)
+        self.assert_enter_command_mode()
+        self.assert_particle_polled(DriverEvent.ACQUIRE_SAMPLE, self.assert_particle_sample, DataParticleType.VELOCITY,
+                                    timeout=10, sample_count=1)
 
     def test_autosample(self):
         """
-        Verify data particles for autosampling that are specific to Vector
+        Verify data particles for auto-sampling that are specific to Vector
         """
         self.assert_enter_command_mode()
-        self.assert_particle_polled(Capability.START_AUTOSAMPLE, self.assert_particle_velocity, DataParticleType.VELOCITY_HEADER)
-        self.assert_particle_async(DataParticleType.VELOCITY, self.assert_particle_sample, timeout=10)
-        self.assert_particle_async(DataParticleType.SYSTEM, self.assert_particle_system, timeout=10)
+        self.assert_start_autosample()
+
+        self.assert_particle_async(DataParticleType.SYSTEM, self.assert_particle_system)
+        self.assert_particle_async(DataParticleType.VELOCITY, self.assert_particle_sample)
+
+        self.assert_stop_autosample()
