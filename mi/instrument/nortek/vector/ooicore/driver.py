@@ -1,14 +1,14 @@
 """
 @package mi.instrument.nortek.vector.ooicore.driver
 @file mi/instrument/nortek/vector/ooicore/driver.py
-@author Ronald Ronquillo
+@author Ronald Ronquillo, Rachel Manoni
 @brief Driver for the ooicore
 Release notes:
 
 Driver for vector
 """
 
-__author__ = 'Ronald Ronquillo'
+__author__ = 'Ronald Ronquillo, Rachel Manoni'
 __license__ = 'Apache 2.0'
 
 import base64
@@ -334,10 +334,10 @@ class InstrumentDriver(NortekInstrumentDriver):
         """
         #Construct superclass.
         NortekInstrumentDriver.__init__(self, evt_callback)
+
     ########################################################################
     # Protocol builder.
     ########################################################################
-
     def _build_protocol(self):
         """
         Construct the driver protocol state machine.
