@@ -1,7 +1,7 @@
 """
 @package mi.instrument.nortek.aquadopp.ooicore.test.test_driver
 @file /marine-integrations/mi/instrument/nortek/aquadopp/ooicore/driver.py
-@author Ronald Ronquillo
+@author Rachel Manoni, Ronald Ronquillo
 @brief Test cases for ooicore driver
 
 USAGE:
@@ -19,11 +19,12 @@ USAGE:
        $ bin/nosetests -s -v /Users/Bill/WorkSpace/marine-integrations/mi/instrument/nortek/aquadopp/ooicore -a QUAL
 """
 
-__author__ = 'Ronald Ronquillo'
+__author__ = 'Rachel Manoni, Ronald Ronquillo'
 __license__ = 'Apache 2.0'
 
 from gevent import monkey
 monkey.patch_all()
+import gevent
 
 from nose.plugins.attrib import attr
 
@@ -32,19 +33,21 @@ log = get_logger()
 
 from mi.idk.unit_test import InstrumentDriverTestCase, ParameterTestConfigKey
 
-from mi.core.instrument.instrument_driver import DriverConfigKey
+from mi.core.instrument.instrument_driver import DriverConfigKey, ResourceAgentState
 
 from mi.core.instrument.data_particle import DataParticleKey, DataParticleValue
 from mi.core.instrument.chunker import StringChunker
 
 from mi.core.exceptions import SampleException
 
-from mi.instrument.nortek.aquadopp.ooicore.driver import NortekDataParticleType, Protocol
+from mi.instrument.nortek.aquadopp.ooicore.driver import NortekDataParticleType
 from mi.instrument.nortek.aquadopp.ooicore.driver import AquadoppDwVelocityDataParticle
 from mi.instrument.nortek.aquadopp.ooicore.driver import AquadoppDwVelocityDataParticleKey
 
-from mi.instrument.nortek.test.test_driver import NortekUnitTest, NortekIntTest, NortekQualTest, DriverTestMixinSub
-from mi.instrument.nortek.driver import ProtocolState, ProtocolEvent, TIMEOUT, Parameter, NortekEngIdDataParticleKey
+from mi.instrument.nortek.test.test_driver import NortekUnitTest, NortekIntTest, NortekQualTest, DriverTestMixinSub, \
+    user_config2
+from mi.instrument.nortek.driver import ProtocolState, ProtocolEvent, TIMEOUT, Parameter, NortekEngIdDataParticleKey, \
+    NortekInstrumentProtocol, NEWLINE
 
 ###
 #   Driver parameters for the tests
@@ -223,8 +226,7 @@ class DriverUnitTest(NortekUnitTest):
         3. combined data structure
         4. data structure with noise
         """
-
-        chunker = StringChunker(Protocol.sieve_function)
+        chunker = StringChunker(NortekInstrumentProtocol.sieve_function)
 
         self.assert_chunker_sample(chunker, velocity_sample())
         self.assert_chunker_fragmented_sample(chunker, velocity_sample())
@@ -290,7 +292,7 @@ class QualFromIDK(NortekQualTest, AquadoppDriverTestMixinSub):
     def setUp(self):
         NortekQualTest.setUp(self)
 
-    def test_direct_access_telnet_mode_driver(self):
+    def test_direct_access_telnet_mode(self):
         """
         Verify the Instrument Driver properly supports direct access to the
         physical instrument. (telnet mode)
@@ -302,7 +304,36 @@ class QualFromIDK(NortekQualTest, AquadoppDriverTestMixinSub):
         result = self.tcp_client.expect("AQUADOPP")
         self.assertTrue(result)
 
+        log.debug("DA Server Started.  Reading battery voltage")
+        self.tcp_client.send_data("BV")
+        self.tcp_client.expect("\x06\x06")
+
+        self.tcp_client.send_data("CC" + user_config2())
+        self.tcp_client.expect("\x06\x06")
+
         self.assert_direct_access_stop_telnet()
+
+        #verify the setting got restored.
+        self.assert_state_change(ResourceAgentState.COMMAND, ProtocolState.COMMAND, 10)
+        self.assert_get_parameter(Parameter.DIAGNOSTIC_INTERVAL, 11250)
+
+        # Test direct access inactivity timeout
+        self.assert_direct_access_start_telnet(inactivity_timeout=30, session_timeout=90)
+        self.assert_state_change(ResourceAgentState.COMMAND, ProtocolState.COMMAND, 60)
+
+        # Test session timeout without activity
+        self.assert_direct_access_start_telnet(inactivity_timeout=120, session_timeout=30)
+        self.assert_state_change(ResourceAgentState.COMMAND, ProtocolState.COMMAND, 60)
+
+        # Test direct access session timeout with activity
+        self.assert_direct_access_start_telnet(inactivity_timeout=30, session_timeout=60)
+        # Send some activity every 30 seconds to keep DA alive.
+        for i in range(1, 2, 3):
+            self.tcp_client.send_data(NEWLINE)
+            log.debug("Sending a little keep alive communication, sleeping for 15 seconds")
+            gevent.sleep(15)
+
+        self.assert_state_change(ResourceAgentState.COMMAND, ProtocolState.COMMAND, 45)
 
     def test_poll(self):
         """
@@ -315,4 +346,4 @@ class QualFromIDK(NortekQualTest, AquadoppDriverTestMixinSub):
         Verify the driver can enter and exit autosample mode, while in autosample the driver will collect multiple
         samples.
         """
-        self.assert_sample_autosample(self.assert_particle_velocity, NortekDataParticleType.VELOCITY, timeout=10)
+        self.assert_sample_autosample(self.assert_particle_velocity, NortekDataParticleType.VELOCITY, timeout=20)
