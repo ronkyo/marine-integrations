@@ -97,7 +97,7 @@ class AquadoppDwVelocityDataParticle(DataParticle):
 
     def _build_particle(self, match):
         """
-        Build a particle.  Used for parsing Velocity and Diagnostic data
+        Build a particle.  Used for parsing Velocity
         """
         timestamp = NortekProtocolParameterDict.convert_time(match.group(1))
         error = NortekProtocolParameterDict.convert_word_to_int(match.group(2))
@@ -211,7 +211,6 @@ class Protocol(NortekInstrumentProtocol):
     Instrument protocol class
     Subclasses NortekInstrumentProtocol
     """
-
     NortekInstrumentProtocol.velocity_data_regex.extend(AQUADOPP_SAMPLE_REGEX)
     NortekInstrumentProtocol.velocity_sync_bytes = VELOCITY_DATA_SYNC_BYTES
 
