@@ -8,11 +8,15 @@ Release notes:
 This Driver supports the Kongsberg UnderWater Technology's EK60 Instrument.
 """
 import ftplib
+import json
+import re
 import tempfile
+import urllib2
 from xml.dom.minidom import parseString
 from mi.core.exceptions import InstrumentParameterException, InstrumentException
 from mi.core.instrument.driver_dict import DriverDictKey
 from mi.core.instrument.protocol_param_dict import ParameterDictVisibility, ParameterDictType
+from mock import self
 import yaml
 
 __author__ = 'Richard Han'
@@ -38,8 +42,60 @@ from mi.core.instrument.data_particle import CommonDataParticleType
 from mi.core.instrument.chunker import StringChunker
 
 
+# Default Instrument's IP Address
+DEFAULT_HOST = "https://10.33.10.143"
+
+# Config file name to be stored on the instrument server
+ZPLSC_CONFIG_FILE_NAME = "zplsc_config.ymal"
+
 # newline.
 NEWLINE = '\r\n'
+
+# String constants
+CONNECTED = "connected"
+CURRENT_RAW_FILENAME = "current_raw_filename"
+CURRENT_RAW_FILESIZE = "current_raw_filesize"
+CURRENT_RUNNING_INTERVAL = "current_running_interval"
+CURRENT_UTC_TIME = "current_utc_time"
+DURATION = "duration"
+ER60_CHANNELS = "er60_channels"
+ER60_STATUS  = "er60_status"
+EXECUTABLE = "executable"
+FILE_PATH = "file_path"
+FILE_PREFIX = "file_prefix"
+FREQUENCY = "frequency"
+FREQ_120K = "120000"
+FREQ_200K = "200000"
+FREQ_38K = "38000"
+FS_ROOT = "fs_root"
+GPTS_ENABLED = "gpts_enabled"
+HOST = "host"
+INTERVAL = "interval"
+INTERVALS = "intervals"
+RAW_OUTPUT = "raw_output"
+MAX_FILE_SIZE = "max_file_size"
+MAX_RANGE = "max_range"
+MODE = "mode"
+NAME = "name"
+NEXT_SCHEDULED_INTERVAL = "next_scheduled_interval"
+PID = "pid"
+PORT = "port"
+POWER = "power"
+PULSE_LENGTH = "pulse_length"
+SAMPLE_INTERVAL = "sample_interval"
+SAMPLE_RANGE = "sample_range"
+SAVE_INDEX = "save_index"
+SAVE_BOTTOM = "save_bottom"
+SAVE_RAW = "save_raw"
+SCHEDULE = "schedule"
+SCHEDULE_FILENAME = "schedule_filename"
+SCHEDULED_INTERVAL_REMAINING = "scheduled_interval_remaining"
+START_AT = "start_at"
+STOP_REPEATING_AT = "stop_repeating_at"
+TYPE = "type"
+USER_NAME = "ooi"
+PASSWORD = "994ef22"
+
 
 # default timeout.
 TIMEOUT = 10
@@ -106,18 +162,18 @@ class Parameter(DriverParameter):
     INTERVAL = "interval"
     MAX_RANGE = "max_range"
     MINIMUM_INTERVAL = "minimum_interval"
-    NUMBER_OF_PINGS = "number"
-    FREQUENCY_38K_MODE = "freq_38k_mode"
-    FREQUENCY_38K_POWER = "freq_38k_power"
-    FREQUENCY_38K_PULSE_LENGTH = "freq_38k_Pulse_length"
-    FREQUENCY_120K_MODE = "freq_120k_mode"
-    FREQUENCY_120K_POWER = "freq_120k_power"
-    FREQUENCY_120K_PULSE_LENGTH = "freq_120k_Pulse_length"
-    FREQUENCY_200K_MODE = "freq_200k_mode"
-    FREQUENCY_200K_POWER = "freq_200k_power"
-    FREQUENCY_200K_PULSE_LENGTH = "freq_200k_Pulse_length"
+    NUMBER = "number"
+    FREQ_38K_MODE = "freq_38k_mode"
+    FREQ_38K_POWER = "freq_38k_power"
+    FREQ_38K_PULSE_LENGTH = "freq_38k_Pulse_length"
+    FREQ_120K_MODE = "freq_120k_mode"
+    FREQ_120K_POWER = "freq_120k_power"
+    FREQ_120K_PULSE_LENGTH = "freq_120k_Pulse_length"
+    FREQ_200K_MODE = "freq_200k_mode"
+    FREQ_200K_POWER = "freq_200k_power"
+    FREQ_200K_PULSE_LENGTH = "freq_200k_Pulse_length"
     FTP_IP_ADDRESS = "ftp_ip_address"
-    FTP_PORT_NUMBER = "ftp_port_number"
+    #FTP_PORT_NUMBER = "ftp_port_number"
 
 
 class Prompt(BaseEnum):
@@ -129,19 +185,395 @@ class Command(BaseEnum):
     """
     Instrument command strings
     """
-    INSTRUMENT_STATUS  = 'instrument_status'
-    GET_SCHEDULE = 'get_schedule'
-    LIST_SCHEDULE = 'list_schedule'
+    ACQUIRE_STATUS  = 'acquire_status'
     START_AUTOSAMPLE = 'start_autosample'
     STOP_AUTOSAMPLE = 'stop_autosample'
     GET = 'get_param'
     SET = 'set_param'
+
+class DataParticleType(BaseEnum):
+    RAW = CommonDataParticleType.RAW
+    ZPLSC_STATUS = 'zplsc_status'
 
 
 
 ###############################################################################
 # Data Particles
 ###############################################################################
+class ZPLSCStatusParticleKey(BaseEnum):
+    ZPLSC_CONNECTED = "zplcs_connected"                                     # Connected to a running ER 60 instance
+    ZPLSC_ACTIVE_38K_MODE = "zplcs_active_38k_mode"                         # 38K Transducer transmit mode
+    ZPLSC_ACTIVE_38K_POWER = "zplcs_active_38k_power"                       # 38K Transducer transmit power in W
+    ZPLSC_ACTIVE_38K_PULSE_LENGTH = "zplcs_active_38k_pulse_length"         # 38K Transducer transmit pulse length in seconds
+    ZPLSC_ACTIVE_38K_SAMPLE_INTERVAL = "zplcs_active_38k_sample_interval"   # Sample interval in seconds
+    ZPLSC_ACTIVE_120K_MODE = "zplcs_active_120k_mode"                       # 120K Transducer transmit mode
+    ZPLSC_ACTIVE_120K_POWER = "zplcs_active_120k_power"                     # 120K Transducer transmit power in W
+    ZPLSC_ACTIVE_120K_PULSE_LENGTH = "zplcs_active_120k_pulse_length"       # 120K Transducer Transmit pulse length in seconds
+    ZPLSC_ACTIVE_120K_SAMPLE_INTERVAL = "zplcs_active_120k_sample_interval" # 120K Sample Interval
+    ZPLSC_ACTIVE_200K_MODE = "zplcs_active_200k_mode"                       # 200K Transducer transmit mode
+    ZPLSC_ACTIVE_200K_POWER = "zplcs_active_200k_power"                     # 200K Transducer transmit power in W
+    ZPLSC_ACTIVE_200K_PULSE_LENGTH = "zplcs_active_220k_pulse_length"       # 200K Transducer transmit pulse length in seconds
+    ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL = "zplcs_active_120k_sample_interval" # 200K Transducer sample interval
+    ZPLSC_CURRENT_UTC_TIME = "zplcs_current_utc_time"                       # Current UTC Time
+    ZPLSC_EXECUTABLE = "zplcs_executable"                                   # Executable used to launch ER60
+    ZPLSC_FS_ROOT = "zplcs_fs_root"                                         # Root directory where data/logs/configs are stored
+    ZPLSC_NEXT_SCHEDULED_INTERVAL = "next_scheduled_interval"               # UTC time of next scheduled interval
+    ZPLSC_HOST = "zplcs_host"                                               # Host IP Address
+    ZPLSC_PID = "zplcs_pid"                                                 # PID of running ER60 process
+    ZPLSC_PORT = "zplsc_port"                                               # Host port number
+    ZPLSC_CURRENT_RAW_FILENAME = "zplcs_current_raw_filename"               # File name of the current .raw file
+    ZPLSC_CURRENT_RAW_FILESIZE = "zplcs_current_raw_filesize"               # File size of current .raw file
+    ZPLSC_FILE_PATH = "zplcs_file_path"                                     # File storage path
+    ZPLSC_FILE_PREFIX = "zplcs_file_prefix"                                 # Current file prefix
+    ZPLSC_MAX_FILE_SIZE = "zplcs_max_file_size"                             # Maximum file size
+    ZPLSC_SAMPLE_RANGE = "zplcs_sample_range"                               # Recording range
+    ZPLSC_SAVE_BOTTOM = "zplcs_save_bottom"                                 # Save bottom file
+    ZPLSC_SAVE_INDEX = "zplcs_save_index"                                   # Save index file
+    ZPLSC_SAVE_RAW = "zplcs_save_raw"                                       # Save raw file
+    ZPLSC_SCHEDULED_INTERVAL_REMAINING = "zplcs_scheduled_interval_remaining" # Number of intervals remaining in running schedule
+    ZPLSC_GPTS_ENABLED = "zplcs_gpts_enabled"                               # GPTs enabled
+    ZPLSC_SCHEDULE_FILENAME = "zplcs_schedule_filename"                     # Filename for .yaml schedule file
+
+
+class ZPLSCStatusParticle(DataParticle):
+    """
+    Routines for parsing raw data into a status particle structure. Override
+    the building of values, and the rest should come along for free.
+
+    Sample:
+    {
+    "schedule_filename": "qct_configuration_example_1.yaml",
+    "schedule": {
+        "max_file_size": 52428800,
+        "intervals": [
+            {
+                "max_range": 220,
+                "start_at": "00:00",
+                "name": "constant_active",
+                "interval": 1000,
+                "frequency": {
+                    "38000": {
+                        "bandwidth": 2425.15,
+                        "pulse_length": 1024,
+                        "mode": "active",
+                        "power": 500,
+                        "sample_interval": 256
+                    },
+                    "120000": {
+                        "bandwidth": 8709.93,
+                        "pulse_length": 256,
+                        "mode": "active",
+                        "power": 100,
+                        "sample_interval": 64
+                    },
+                    "200000": {
+                        "bandwidth": 10635,
+                        "pulse_length": 256,
+                        "mode": "active",
+                        "power": 120,
+                        "sample_interval": 64
+                    }
+                },
+                "duration": "00:01:30",
+                "stop_repeating_at": "23:55",
+                "type": "constant"
+            }
+        ],
+        "file_path": "QCT_1",
+        "file_prefix": "OOI"
+    },
+    "er60_channels": {
+        "GPT 200 kHz 00907207b7b1 6-2 OOI38|200": {
+            "pulse_length": 0.000256,
+            "frequency": 200000,
+            "sample_interval": 0.000064,
+            "power": 25,
+            "mode": "passive"
+        },
+        "GPT 120 kHz 00907207b7dc 1-1 ES120-7CD": {
+            "pulse_length": 0.000256,
+            "frequency": 120000,
+            "sample_interval": 0.000064,
+            "power": 25,
+            "mode": "passive"
+        },
+        "GPT  38 kHz 00907207b7b1 6-1 OOI.38|200": {
+            "pulse_length": 0.001024,
+            "frequency": 38000,
+            "sample_interval": 0.000256,
+            "power": 100,
+            "mode": "passive"
+        }
+    },
+    "gpts_enabled": false,
+    "er60_status": {
+        "executable": "c:/users/ooi/desktop/er60.lnk",
+        "current_utc_time": "2014-05-28 20:55:09.971000",
+        "current_running_interval": null,
+        "pid": 3560,
+        "host": "157.237.15.100",
+        "scheduled_intervals_remaining": 96,
+        "next_scheduled_interval": "2014-05-28 00:00:00.000000",
+        "raw_output": {
+            "max_file_size": 52428800,
+            "sample_range": 30,
+            "file_prefix": "OOI",
+            "save_raw": true,
+            "current_raw_filesize": null,
+            "save_index": true,
+            "save_bottom": true,
+            "current_raw_filename": "OOI-D20140527-T110604.raw",
+            "file_path": "D:\\data\\QCT_3"
+        },
+        "fs_root": "D:/",
+        "port": 52890
+    },
+    "connected": true
+    }
+
+    """
+    _data_particle_type = DataParticleType.ZPLSC_STATUS
+
+    @staticmethod
+    def regex():
+        """
+        Regular expression to match a sample pattern
+        @return: regex string
+        """
+        pattern = r'#? *' # patter may or may not start with a '
+        pattern += r'([0-9A-F]{6})' # temperature
+        pattern += NEWLINE
+        return pattern
+
+    @staticmethod
+    def regex_compiled():
+        """
+        get the compiled regex pattern
+        @return: compiled re
+        """
+        return re.compile(ZPLSCStatusParticle.regex())
+
+    def _build_parsed_values(self):
+        """
+        Parse ZPLSC Status response and return the ZPLSC Status particles
+        @throws SampleException If there is a problem with sample
+
+        example of ZPLSC Status:
+        {
+        "schedule_filename": "qct_configuration_example_1.yaml",
+        "schedule": {
+            "max_file_size": 52428800,
+            "intervals": [
+                {
+                    "max_range": 220,
+                    "start_at": "00:00",
+                    "name": "constant_active",
+                    "interval": 1000,
+                    "frequency": {
+                        "38000": {
+                            "bandwidth": 2425.15,
+                            "pulse_length": 1024,
+                            "mode": "active",
+                            "power": 500,
+                            "sample_interval": 256
+                        },
+                        "120000": {
+                            "bandwidth": 8709.93,
+                            "pulse_length": 256,
+                            "mode": "active",
+                            "power": 100,
+                            "sample_interval": 64
+                        },
+                        "200000": {
+                            "bandwidth": 10635,
+                            "pulse_length": 256,
+                            "mode": "active",
+                            "power": 120,
+                            "sample_interval": 64
+                        }
+                    },
+                    "duration": "00:01:30",
+                    "stop_repeating_at": "23:55",
+                    "type": "constant"
+                }
+            ],
+            "file_path": "QCT_1",
+            "file_prefix": "OOI"
+        },
+        "er60_channels": {
+            "GPT 200 kHz 00907207b7b1 6-2 OOI38|200": {
+                "pulse_length": 0.000256,
+                "frequency": 200000,
+                "sample_interval": 0.000064,
+                "power": 25,
+                "mode": "passive"
+            },
+            "GPT 120 kHz 00907207b7dc 1-1 ES120-7CD": {
+                "pulse_length": 0.000256,
+                "frequency": 120000,
+                "sample_interval": 0.000064,
+                "power": 25,
+                "mode": "passive"
+            },
+            "GPT  38 kHz 00907207b7b1 6-1 OOI.38|200": {
+                "pulse_length": 0.001024,
+                "frequency": 38000,
+                "sample_interval": 0.000256,
+                "power": 100,
+                "mode": "passive"
+            }
+        },
+        "gpts_enabled": false,
+        "er60_status": {
+            "executable": "c:/users/ooi/desktop/er60.lnk",
+            "current_utc_time": "2014-05-28 21:31:44.929000",
+            "current_running_interval": null,
+            "pid": 3560,
+            "host": "157.237.15.100",
+            "scheduled_intervals_remaining": 96,
+            "next_scheduled_interval": "2014-05-28 00:00:00.000000",
+            "raw_output": {
+                "max_file_size": 52428800,
+                "sample_range": 30,
+                "file_prefix": "OOI",
+                "save_raw": true,
+                "current_raw_filesize": null,
+                "save_index": true,
+                "save_bottom": true,
+                "current_raw_filename": "OOI-D20140527-T110604.raw",
+                "file_path": "D:\\data\\QCT_3"
+            },
+            "fs_root": "D:/",
+            "port": 52890
+        },
+        "connected": true
+        }
+        """
+        try:
+            config = json.loads(self.raw_data)
+            if not isinstance(config, dict):
+                raise SampleException("ZPLSC status data is not a dictionary" % self.raw_data)
+
+            connected = config[CONNECTED]
+            for key in config[ER60_CHANNELS]:
+                if '200 kHz' in key:
+                    active_200k_mode = config[ER60_CHANNELS][key][MODE]
+                    active_200k_power = config[ER60_CHANNELS][key][POWER]
+                    active_200k_pulse_length = config[ER60_CHANNELS][key][PULSE_LENGTH]
+                    active_200k_sample_interval = config[ER60_CHANNELS][key][SAMPLE_INTERVAL]
+                elif '120 kHz' in key:
+                    active_120k_mode = config[ER60_CHANNELS][key][MODE]
+                    active_120k_power = config[ER60_CHANNELS][key][POWER]
+                    active_120k_pulse_length = config[ER60_CHANNELS][key][PULSE_LENGTH]
+                    active_120k_sample_interval = config[ER60_CHANNELS][key][SAMPLE_INTERVAL]
+                elif '38 kHz' in key:
+                    active_38k_mode = config[ER60_CHANNELS][key][MODE]
+                    active_38k_power = config[ER60_CHANNELS][key][POWER]
+                    active_38k_pulse_length = config[ER60_CHANNELS][key][PULSE_LENGTH]
+                    active_38k_sample_interval = config[ER60_CHANNELS][key][SAMPLE_INTERVAL]
+
+
+            er60_status = config[ER60_STATUS]
+            current_utc_time = er60_status[CURRENT_UTC_TIME]
+            executable = er60_status[EXECUTABLE]
+            fs_root = er60_status[FS_ROOT]
+            next_scheduled_interval = er60_status[NEXT_SCHEDULED_INTERVAL]
+            host = er60_status[HOST]
+            pid = er60_status[PID]
+            #port = er60_status[PORT]
+
+            raw_output = config[ER60_STATUS][RAW_OUTPUT]
+            current_raw_filename = raw_output[CURRENT_RAW_FILENAME]
+            current_raw_filesize = raw_output[CURRENT_RAW_FILESIZE]
+            file_path = raw_output[FILE_PATH]
+            file_prefix = raw_output[FILE_PREFIX]
+            max_file_size = raw_output[MAX_FILE_SIZE]
+            sample_range = raw_output[SAMPLE_RANGE]
+            save_bottom = raw_output[SAVE_BOTTOM]
+            save_index = raw_output[SAVE_INDEX]
+            save_raw = raw_output[SAVE_RAW]
+            scheduled_interval_remaining = er60_status[SCHEDULED_INTERVAL_REMAINING]
+            gpts_enabled = config[GPTS_ENABLED]
+            schedule_filename = config[SCHEDULE_FILENAME]
+
+            # intervals = []
+            # for each in config['schedule']['intervals']:
+            #     d = {}
+            #     d[ZPLSCStatusParticleKey.FREQ_38K_MODE] = each['frequency']['38000']['mode']
+            #     intervals.append(d)
+            #
+            # for index, each in enumerate(intervals):
+            #     for key, value in each.iteritems:
+            #         value_id = '%s_%d' % (key, index)
+            #         result.append({DataParticleKey.VALUE_ID: value_id, DataParticleKey.VALUE: value})
+
+
+        except KeyError:
+             raise SampleException("ValueError while converting ZPLSC Status: [%s]" %
+                                  self.raw_data)
+
+        result = [{DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_MODE,
+                   DataParticleKey.VALUE: active_200k_mode},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_POWER,
+                   DataParticleKey.VALUE: active_200k_power},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_PULSE_LENGTH,
+                    DataParticleKey.VALUE: active_200k_pulse_length},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL,
+                   DataParticleKey.VALUE: active_200k_sample_interval},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_MODE,
+                   DataParticleKey.VALUE: active_120k_mode},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_POWER,
+                   DataParticleKey.VALUE: active_120k_power},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_PULSE_LENGTH,
+                    DataParticleKey.VALUE: active_120k_pulse_length},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_SAMPLE_INTERVAL,
+                   DataParticleKey.VALUE: active_120k_sample_interval},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_POWER,
+                   DataParticleKey.VALUE: active_120k_power},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_PULSE_LENGTH,
+                    DataParticleKey.VALUE: active_38k_pulse_length},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_SAMPLE_INTERVAL,
+                   DataParticleKey.VALUE: active_38k_sample_interval},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CURRENT_UTC_TIME,
+                   DataParticleKey.VALUE: current_utc_time},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_EXECUTABLE,
+                   DataParticleKey.VALUE: executable},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_FS_ROOT,
+                   DataParticleKey.VALUE: fs_root},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_NEXT_SCHEDULED_INTERVAL,
+                   DataParticleKey.VALUE: next_scheduled_interval},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_HOST,
+                   DataParticleKey.VALUE: host},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_PID,
+                   DataParticleKey.VALUE: pid},
+                  #{DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_PORT,
+                  #DataParticleKey.VALUE: port},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILENAME,
+                   DataParticleKey.VALUE: current_raw_filename},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILESIZE,
+                   DataParticleKey.VALUE: current_raw_filesize},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_FILE_PATH,
+                   DataParticleKey.VALUE: file_path},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_FILE_PREFIX,
+                   DataParticleKey.VALUE: file_prefix},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_MAX_FILE_SIZE,
+                   DataParticleKey.VALUE: max_file_size},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAMPLE_RANGE,
+                   DataParticleKey.VALUE: sample_range},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAVE_BOTTOM,
+                   DataParticleKey.VALUE: save_bottom},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAVE_INDEX,
+                   DataParticleKey.VALUE: save_index},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAVE_RAW,
+                   DataParticleKey.VALUE: save_raw},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SCHEDULED_INTERVAL_REMAINING,
+                   DataParticleKey.VALUE: scheduled_interval_remaining},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_GPTS_ENABLED,
+                   DataParticleKey.VALUE: gpts_enabled},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SCHEDULE_FILENAME,
+                   DataParticleKey.VALUE: schedule_filename}]
+
+        return result
 
 
 ###############################################################################
@@ -206,6 +638,7 @@ class Protocol(CommandResponseInstrumentProtocol):
         self._protocol_fsm.add_handler(ProtocolState.COMMAND, ProtocolEvent.EXIT, self._handler_command_exit)
         self._protocol_fsm.add_handler(ProtocolState.COMMAND, ProtocolEvent.START_DIRECT, self._handler_command_start_direct)
         self._protocol_fsm.add_handler(ProtocolState.COMMAND, ProtocolEvent.START_AUTOSAMPLE, self._handler_command_autosample)
+        self._protocol_fsm.add_handler(ProtocolState.COMMAND, ProtocolEvent.ACQUIRE_STATUS, self._handler_command_acquire_status)
         self._protocol_fsm.add_handler(ProtocolState.COMMAND, ProtocolEvent.GET, self._handler_command_get)
         self._protocol_fsm.add_handler(ProtocolState.COMMAND, ProtocolEvent.SET, self._handler_command_set)
 
@@ -226,10 +659,13 @@ class Protocol(CommandResponseInstrumentProtocol):
         # Add build handlers for device commands.
         self._add_build_handler(Command.GET, self._build_get_command)
         self._add_build_handler(Command.SET, self._build_set_command)
+        self._add_build_handler(Command.STATUS, self._build_status_command)
+
 
         # Add response handlers for device commands.
         self._add_response_handler(Command.GET, self._parse_get_response)
         self._add_response_handler(Command.SET, self._parse_set_response)
+        self._add_response_handler(Command.STATUS, self._parse_status_response)
         self._add_response_handler(Command.GET_SCHEDULE, self._parse_get_schedule)
         self._add_response_handler(Command.LIST_SCHEDULE, self._parse_list_schedule)
 
@@ -268,11 +704,11 @@ class Protocol(CommandResponseInstrumentProtocol):
         self._param_dict.add(Parameter.NAME,
                              r'name:\s+(\w+)',
                              lambda match : match.group(1),
-                             self.__str__(),
+                             str,
                              type=ParameterDictType.STRING,
                              display_name="Name",
                              startup_param = True,
-                             direct_access = True,
+                             direct_access = False,
                              default_value = "constant",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
@@ -283,7 +719,7 @@ class Protocol(CommandResponseInstrumentProtocol):
                              type=ParameterDictType.STRING,
                              display_name="Type",
                              startup_param = True,
-                             direct_access = True,
+                             direct_access = False,
                              default_value = "constant",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
@@ -294,8 +730,8 @@ class Protocol(CommandResponseInstrumentProtocol):
                              type=ParameterDictType.STRING,
                              display_name="Start At",
                              startup_param = True,
-                             direct_access = True,
-                             default_value = "00:00-23:59",
+                             direct_access = False,
+                             default_value = "00:00",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
         self._param_dict.add(Parameter.DURATION,
@@ -305,8 +741,8 @@ class Protocol(CommandResponseInstrumentProtocol):
                              type=ParameterDictType.STRING,
                              display_name="Duration",
                              startup_param = True,
-                             direct_access = True,
-                             default_value = 0.05,
+                             direct_access = False,
+                             default_value = "00:15:00",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
         self._param_dict.add(Parameter.REPEAT_EVERY,
@@ -316,8 +752,8 @@ class Protocol(CommandResponseInstrumentProtocol):
                              type=ParameterDictType.FLOAT,
                              display_name="Repeat Every",
                              startup_param = True,
-                             direct_access = True,
-                             default_value = "00:00-23:59",
+                             direct_access = False,
+                             default_value = "01:00",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
         self._param_dict.add(Parameter.STOP_REPEATING_AT,
@@ -327,8 +763,8 @@ class Protocol(CommandResponseInstrumentProtocol):
                              type=ParameterDictType.STRING,
                              display_name="Stop Repeat At",
                              startup_param = True,
-                             direct_access = True,
-                             default_value = "00:00-23:59",
+                             direct_access = False,
+                             default_value = "23:55",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
         self._param_dict.add(Parameter.INTERVAL,
@@ -338,8 +774,8 @@ class Protocol(CommandResponseInstrumentProtocol):
                              type=ParameterDictType.INT,
                              display_name="Interval",
                              startup_param = True,
-                             direct_access = True,
-                             default_value = 100,
+                             direct_access = False,
+                             default_value = 1000,
                              visibility=ParameterDictVisibility.READ_WRITE)
 
         self._param_dict.add(Parameter.MAX_RANGE,
@@ -349,7 +785,7 @@ class Protocol(CommandResponseInstrumentProtocol):
                              type=ParameterDictType.INT,
                              display_name="Max Range",
                              startup_param = True,
-                             direct_access = True,
+                             direct_access = False,
                              default_value = 80,
                              visibility=ParameterDictVisibility.IMMUTABLE)
 
@@ -360,99 +796,110 @@ class Protocol(CommandResponseInstrumentProtocol):
                              type=ParameterDictType.INT,
                              display_name="Minimum Interval",
                              startup_param = True,
-                             direct_access = True,
-                             default_value = 100,
+                             direct_access = False,
+                             default_value = 0,
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FREQUENCY_38K_MODE,
+        self._param_dict.add(Parameter.NUMBER,
+                             r'number:\s+(\d+)',
+                             lambda match : match.group(1),
+                             self._int_to_string(),
+                             type=ParameterDictType.INT,
+                             display_name="Number",
+                             startup_param = True,
+                             direct_access = False,
+                             default_value = 0,
+                             visibility=ParameterDictVisibility.READ_WRITE)
+
+        self._param_dict.add(Parameter.FREQ_38K_MODE,
                              r'number:\s+(\w+)',
                              lambda match : match.group(1),
                              self._int_to_string(),
                              type=ParameterDictType.STRING,
                              display_name="Freq 38K Mode",
                              startup_param = True,
-                             direct_access = True,
+                             direct_access = False,
                              default_value = "active",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FREQUENCY_38K_POWER,
+        self._param_dict.add(Parameter.FREQ_38K_POWER,
                              r'number:\s+(\d+)',
                              lambda match : True if match.group(1) == 'yes' else False,
                              self._int_to_string,
                              type=ParameterDictType.INT,
-                             display_name="Beam Angle",
+                             display_name="Freq 38K Power",
                              startup_param = True,
-                             direct_access = True,
+                             direct_access = False,
                              default_value = 100,
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FREQUENCY_38K_PULSE_LENGTH,
+        self._param_dict.add(Parameter.FREQ_38K_PULSE_LENGTH,
                              r'pulse_length:\s+(\d+)',
                              lambda match : match.group(1),
                              self._int_to_string,
                              type=ParameterDictType.INT,
                              display_name="Freq 38K Pulse Length",
                              startup_param = True,
-                             direct_access = True,
+                             direct_access = False,
                              default_value = 256,
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FREQUENCY_120K_MODE,
+        self._param_dict.add(Parameter.FREQ_120K_MODE,
                              r'mode:\s+(\w+)',
                              lambda match : match.group(1),
                              self._int_to_string(),
                              type=ParameterDictType.STRING,
-                             display_name="Freq 38K Mode",
+                             display_name="Freq 120K Mode",
                              startup_param = True,
-                             direct_access = True,
+                             direct_access = False,
                              default_value = "active",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FREQUENCY_120K_POWER,
+        self._param_dict.add(Parameter.FREQ_120K_POWER,
                              r'power:\s+(\d+)',
                              lambda match : match.group(1),
                              self._int_to_string,
                              type=ParameterDictType.INT,
-                             display_name="Beam Angle",
+                             display_name="Freq 120K Power",
                              startup_param = True,
                              direct_access = True,
                              default_value = 100,
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FREQUENCY_120K_PULSE_LENGTH,
+        self._param_dict.add(Parameter.FREQ_120K_PULSE_LENGTH,
                              r'pulse_length:\s+(\d+)',
                              lambda match : match.group(1),
                              self._int_to_string,
                              type=ParameterDictType.INT,
                              display_name="Freq 120K Pulse Length",
                              startup_param = True,
-                             direct_access = True,
-                             default_value = 256,
+                             direct_access = False,
+                             default_value = 64,
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FREQUENCY_200K_MODE,
+        self._param_dict.add(Parameter.FREQ_200K_MODE,
                              r'mode:\s+(\w+)',
                              lambda match : match.group(1),
                              self._int_to_string(),
                              type=ParameterDictType.STRING,
                              display_name="Freq 200K Mode",
                              startup_param = True,
-                             direct_access = True,
+                             direct_access = False,
                              default_value = "active",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FREQUENCY_200K_POWER,
+        self._param_dict.add(Parameter.FREQ_200K_POWER,
                              r'power:\s+(\d+)',
                              lambda match : match.group(1),
                              self._int_to_string,
                              type=ParameterDictType.INT,
-                             display_name="Beam Angle",
+                             display_name="Freq 200K Power",
                              startup_param = True,
                              direct_access = True,
                              default_value = 100,
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FREQUENCY_200K_PULSE_LENGTH,
+        self._param_dict.add(Parameter.FREQ_200K_PULSE_LENGTH,
                              r'pulse_length:\s+(\d+)',
                              lambda match : match.group(1),
                              self._int_to_string,
@@ -556,24 +1003,25 @@ class Protocol(CommandResponseInstrumentProtocol):
         config_file = tempfile.TemporaryFile()
         config_file.write(yaml.dump(config, default_flow_style=False))
 
+
         return config_file
 
 
-    def _ftp_config_file(self, config_file):
+    def _ftp_config_file(self, config_file, file_name):
         """
-        FTP the configuration file to the web server
+        FTP the configuration file to the ZPLSC server
         """
 
         host = self._param_dict.get_config_value(Parameter.FTP_IP_ADDRESS)
         port = self._param_dict.get_config_value(Parameter.FTP_PORT_NUMBER)
-        user_name = 'ooi'
-        password = '994ef22'
+        #user_name = 'ooi'
+        #password = '994ef22'
 
         if ((config_file == None) or (not isinstance(config_file, tempfile))):
             raise InstrumentException("config_file is not a tempfile!")
 
         try:
-            ftp_session = ftplib.FTP(host, user_name, password)
+            ftp_session = ftplib.FTP(host, USER_NAME, PASSWORD)
 
         except (ftplib.socket.error, ftplib.socket.gaierror), e:
             log.error("ERROR: cannot reach FTP Host %s " % (host))
@@ -581,43 +1029,43 @@ class Protocol(CommandResponseInstrumentProtocol):
         log.debug("*** Connected to ftp host %s" % (host))
 
         # FTP the instrument's config file to the instrument sever
-        ftp_session.storbinary('STOR config.ymal', config_file)
+        ftp_session.storbinary('STOR %s ' % file_name, config_file)
         log.debug("*** Config ymal file sent")
 
         ftp_session.quit()
 
 
-    def _extract_xml_elements(self, node, tag, raise_exception_if_none_found=True):
-        """
-        extract elements with tag from an XML node
-        @param: node - XML node to look in
-        @param: tag - tag of elements to look for
-        @param: raise_exception_if_none_found - raise an exception if no element is found
-        @return: return list of elements found; empty list if none found
-        """
-        elements = node.getElementsByTagName(tag)
-        if raise_exception_if_none_found and len(elements) == 0:
-            raise SampleException("_extract_xml_elements: No %s in input data: [%s]" % (tag, self.raw_data))
-        return elements
+    # def _extract_xml_elements(self, node, tag, raise_exception_if_none_found=True):
+    #     """
+    #     extract elements with tag from an XML node
+    #     @param: node - XML node to look in
+    #     @param: tag - tag of elements to look for
+    #     @param: raise_exception_if_none_found - raise an exception if no element is found
+    #     @return: return list of elements found; empty list if none found
+    #     """
+    #     elements = node.getElementsByTagName(tag)
+    #     if raise_exception_if_none_found and len(elements) == 0:
+    #         raise SampleException("_extract_xml_elements: No %s in input data: [%s]" % (tag, self.raw_data))
+    #     return elements
 
-    def _extract_xml_element_value(self, node, tag, raise_exception_if_none_found=True):
-        """
-        extract element value that has tag from an XML node
-        @param: node - XML node to look in
-        @param: tag - tag of elements to look for
-        @param: raise_exception_if_none_found - raise an exception if no value is found
-        @return: return value of element
-        """
-        elements = self._extract_xml_elements(node, tag, raise_exception_if_none_found)
-        children = elements[0].childNodes
-        if raise_exception_if_none_found and len(children) == 0:
-            raise SampleException("_extract_xml_element_value: No value for %s in input data: [%s]" % (tag, self.raw_data))
-        return children[0].nodeValue
+    # def _extract_xml_element_value(self, node, tag, raise_exception_if_none_found=True):
+    #     """
+    #     extract element value that has tag from an XML node
+    #     @param: node - XML node to look in
+    #     @param: tag - tag of elements to look for
+    #     @param: raise_exception_if_none_found - raise an exception if no value is found
+    #     @return: return value of element
+    #     """
+    #     elements = self._extract_xml_elements(node, tag, raise_exception_if_none_found)
+    #     children = elements[0].childNodes
+    #     if raise_exception_if_none_found and len(children) == 0:
+    #         raise SampleException("_extract_xml_element_value: No value for %s in input data: [%s]" % (tag, self.raw_data))
+    #     return children[0].nodeValue
 
-    def _get_xml_parameter(self, xml_element, parameter_name, type=float):
-        return {DataParticleKey.VALUE_ID: parameter_name,
-                DataParticleKey.VALUE: type(self._extract_xml_element_value(xml_element,
-                                                                            self._map_param_to_xml_tag(parameter_name)))}
+    # def _get_xml_parameter(self, xml_element, parameter_name, type=float):
+    #     return {DataParticleKey.VALUE_ID: parameter_name,
+    #             DataParticleKey.VALUE: type(self._extract_xml_element_value(xml_element,
+    #                                                                         self._map_param_to_xml_tag(parameter_name)))}
 
     def _build_simple_command(self, cmd):
         """
@@ -640,30 +1088,30 @@ class Protocol(CommandResponseInstrumentProtocol):
         try:
 
            if param == 'INTERVAL':
-                param = 'sampleinterval'
-
-           param = "RemoteCommandDispatcher/ClientTimeoutLimit "
-           header = "REQ\0"
-           msg_control = "2,1,1\0"
-           # XML based Set Param Request
-           msg_request = "<request>" + NEWLINE + \
-                          "  <clientInfo>" + NEWLINE + \
-                          "    <cid>1</cid> " + NEWLINE + \
-                          "    <rid>28</rid> " + NEWLINE + \
-                          "  </clientInfo> " + NEWLINE + \
-                          "  <type>invokeMethod</type> " + NEWLINE + \
-                          "  <targetComponent> ParameterServer </targetComponent> " + + NEWLINE + \
-                          "  <method> " + NEWLINE + \
-                          "    <GetParameter> " + NEWLINE + \
-                          "      <paramName> " + NEWLINE + \
-                          "        %s " + NEWLINE + \
-                          "      </paramName> " + NEWLINE + \
-                          "      <time>0</time> " + NEWLINE + \
-                          "    </GetParameter> " + NEWLINE + \
-                          " </method> " + NEWLINE + \
-                          " </request> " % (param)
-
-           get_cmd = header + msg_control + msg_request + NEWLINE
+               param = 'sampleinterval'
+           #
+           # param = "RemoteCommandDispatcher/ClientTimeoutLimit "
+           # header = "REQ\0"
+           # msg_control = "2,1,1\0"
+           # # XML based Set Param Request
+           # msg_request = "<request>" + NEWLINE + \
+           #                "  <clientInfo>" + NEWLINE + \
+           #                "    <cid>1</cid> " + NEWLINE + \
+           #                "    <rid>28</rid> " + NEWLINE + \
+           #                "  </clientInfo> " + NEWLINE + \
+           #                "  <type>invokeMethod</type> " + NEWLINE + \
+           #                "  <targetComponent> ParameterServer </targetComponent> " + + NEWLINE + \
+           #                "  <method> " + NEWLINE + \
+           #                "    <GetParameter> " + NEWLINE + \
+           #                "      <paramName> " + NEWLINE + \
+           #                "        %s " + NEWLINE + \
+           #                "      </paramName> " + NEWLINE + \
+           #                "      <time>0</time> " + NEWLINE + \
+           #                "    </GetParameter> " + NEWLINE + \
+           #                " </method> " + NEWLINE + \
+           #                " </request> " % (param)
+           #
+           get_cmd = 'get' + NEWLINE
         except KeyError:
            raise InstrumentParameterException('Unknown driver parameter %s' % param)
 
@@ -681,31 +1129,10 @@ class Protocol(CommandResponseInstrumentProtocol):
         """
         try:
 
-           if param == 'INTERVAL':
-                param = 'sampleinterval'
+            str_val = self._param_dict.format(param, val)
 
-           header = 'REQ\0'
-           msg_control = '2,1,1\0'
-           # XML based Set Param Request
-           msg_request = "<request>" + NEWLINE + \
-                          "  <clientInfo>" + NEWLINE + \
-                          "    <cid>1</cid> " + NEWLINE + \
-                          "    <rid>28</rid> " + NEWLINE + \
-                          "  </clientInfo> " + NEWLINE + \
-                          "  <type>invokeMethod</type> " + NEWLINE + \
-                          "  <targetComponent> ParameterServer </targetComponent> " + + NEWLINE + \
-                          "  <method> " + NEWLINE + \
-                          "    <SetParameter> " + NEWLINE + \
-                          "      <paramName> " + NEWLINE + \
-                          "        RemoteCommandDispatcher/ClientTimeoutLimit " + NEWLINE + \
-                          "      </paramName> " + NEWLINE + \
-                          "      <paramValue>60</paramValue> " + NEWLINE + \
-                          "      <paramType>3</paramType> " + NEWLINE + \
-                          "    </SetParameter> " + NEWLINE + \
-                          " </method> " + NEWLINE + \
-                          " </request> " % (param, val, type)
-
-           set_cmd = header + msg_control + msg_request + NEWLINE
+            set_cmd = '%s=%s' % (param, str_val)
+            set_cmd = set_cmd + NEWLINE
 
         except KeyError:
            raise InstrumentParameterException('Unknown driver parameter %s' % param)
@@ -713,35 +1140,6 @@ class Protocol(CommandResponseInstrumentProtocol):
         return set_cmd
 
     def _parse_get_response(self, response, prompt):
-        """
-        Parse handler for get response.
-        @param response get command response string.
-        @param prompt prompt following command response.
-        @throws InstrumentProtocolException if response valid.
-        Example of a Get response from instrumnet
-        <response>
-           <clientInfo>
-             <cidt=”3”>1</cid>
-             <ridt=”3”>28</rid>
-           </clientInfo>
-           <fault>
-           <GetParameterResponse>
-              <paramValue>
-                 <value>60</value>
-                 <time>0</time>
-              <paramValue/>
-           <GetParameterResponse/>
-        </response>
-        """
-        #if prompt not in [Prompt.COMMAND, Prompt.EXECUTED]:
-        #    raise InstrumentProtocolException('dcal command not recognized: %s.' % response)
-
-        dom = parseString(response)
-        root = dom.documentElement
-        log.debug("root.tagName = %s" % (root.tagName))
-        element = self._extract_xml_elements(root, "GetParameterResponse")[0]
-        element = self._extract_xml_elements(element, "paramValue")[0]
-        value = int(self._extract_xml_element_value(element, "value"))
 
         for line in response.split(NEWLINE):
             self._param_dict.update(line)
@@ -760,6 +1158,104 @@ class Protocol(CommandResponseInstrumentProtocol):
 
         for line in response.split(NEWLINE):
             self._param_dict.update(line)
+
+        return response
+
+
+    def _parse_status_response(self, response, prompt):
+        """
+        Parse handler for status response.
+        @param response status command response string.
+        @param prompt prompt following command response.
+        @throws InstrumentProtocolException if response is invalid.
+        { 'connected': True,
+          'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000,
+                                                               'mode': 'passive',
+                                                               'power': 100.0,
+                                                               'pulse_length': 0.001024,
+                                                               'sample_interval': 0.000256},
+                   'GPT 120 kHz 00907207b7dc 1-1 ES120-7CD': {'frequency': 120000,
+                                                              'mode': 'passive',
+                                                              'power': 25.0,
+                                                              'pulse_length': 0.000256,
+                                                              'sample_interval': 6.4e-05},
+                   'GPT 200 kHz 00907207b7b1 6-2 OOI38|200': {'frequency': 200000,
+                                                              'mode': 'passive',
+                                                              'power': 25.0,
+                                                              'pulse_length': 0.000256,
+                                                              'sample_interval': 6.4e-05}},
+          'er60_status': {'current_running_interval': 'constant_passive',
+                   'current_utc_time': '2014-05-22 20:31:02.249000',
+                   'executable': 'c:/users/ooi/desktop/er60.lnk',
+                   'fs_root': 'D:/',
+                   'host': '157.237.15.100',
+                   'next_scheduled_interval': '2014-05-22 20:35:00.000000',
+                   'pid': 2948,
+                   'port': 56765,
+                   'raw_output': {'current_raw_filename': 'OOI-D20140522-T173500.raw',
+                                'current_raw_filesize': None,
+                                'file_path': 'D:\\data\\QCT_3',
+                                'file_prefix': 'OOI',
+                                'max_file_size': 52428800,
+                                'sample_range': 30.0,
+                                'save_bottom': True,
+                                'save_index': True,
+                                'save_raw': True},
+                   'scheduled_intervals_remaining': 40},
+
+          'gpts_enabled': True,
+          'schedule': {'file_path': 'QCT_3',
+              'file_prefix': 'OOI',
+              'intervals': [{'duration': '00:01:30',
+                             'frequency': {'120000': {'bandwidth': 8709.93,
+                                                      'mode': 'passive',
+                                                      'power': 25,
+                                                      'pulse_length': 256,
+                                                      'sample_interval': 64},
+                                           '200000': {'bandwidth': 10635,
+                                                      'mode': 'passive',
+                                                      'power': 25,
+                                                      'pulse_length': 256,
+                                                      'sample_interval': 64},
+                                           '38000': {'bandwidth': 2425.15,
+                                                     'mode': 'passive',
+                                                     'power': 100,
+                                                     'pulse_length': 1024,
+                                                     'sample_interval': 256}},
+                             'interval': 1000,
+                             'max_range': 30,
+                             'name': 'constant_passive',
+                             'start_at': '00:00',
+                             'stop_repeating_at': '23:55',
+                             'type': 'constant'}],
+              'max_file_size': 52428800},
+          'schedule_filename': 'qct_configuration_example_3.yaml'}
+        """
+        # try:
+        #     config = json.loads(response)
+        #     file_path = config['schedule']['file_path'][0]['name']
+        #     name = config['schedule']['intervals'][0]['name']
+        #     type = config['schedule']['intervals'][0]['type']
+        #     interval = config['schedule']['intervals'][0]['interval']
+        #     start_at = config['schedule']['intervals'][0]['start_at']
+        #     duration = config['schedule']['intervals'][0]['duration']
+        #     max_range = config['schedule']['intervals'][0]['max_range']
+        #     stop_repeating_at = config['schedule']['intervals'][0]['stop_repeating_at']
+        #
+        #     feq_38k_mode = config['schedule']['intervals'][0]['frequency']['38000']['mode']
+        #     feq_38k_power = config['schedule']['intervals'][0]['frequency']['38000']['power']
+        #     feq_38k_pulse_length = config['schedule']['intervals'][0]['frequency']['38000']['pulse_length']
+        #     feq_38k_sample_interval = config['schedule']['intervals'][0]['frequency']['38000']['sample_interval']
+        #     feq_120k_mode = config['schedule']['intervals'][0]['frequency']['120000']['mode']
+        #     feq_120k_power = config['schedule']['intervals'][0]['frequency']['120000']['power']
+        #     feq_120k_pulse_length = config['schedule']['intervals'][0]['frequency']['120000']['pulse_length']
+        #     feq_120k_sample_interval = config['schedule']['intervals'][0]['frequency']['120000']['sample_interval']
+        #     feq_200k_mode = config['schedule']['intervals'][0]['frequency']['120000']['mode']
+        #     feq_200k_power = config['schedule']['intervals'][0]['frequency']['120000']['power']
+        #     feq_120k_pulse_length = config['schedule']['intervals'][0]['frequency']['120000']['pulse_length']
+        #     feq_120k_sample_interval = config['schedule']['intervals'][0]['frequency']['120000']['sample_interval']
+        # except KeyError:
+        #      raise InstrumentParameterException('Unknown Key in Instrument Configuration')
 
         return response
 
@@ -945,20 +1441,332 @@ class Protocol(CommandResponseInstrumentProtocol):
         return (next_state, (next_agent_state, result))
 
 
+    def load_schedule(self, filename, host=DEFAULT_HOST):
+        """
+        Loads a schedule file previously uploaded to the instrument and sets it as
+        the active instrument configuration
+        """
+        url = host + '/load_schedule'
+
+        req = urllib2.Request(url, data=json.dumps({'filename': filename}),
+            headers={'Content-Type': 'application/json'})
+        f = urllib2.urlopen(req)
+        res = f.read()
+        f.close()
+        return json.loads(res)
+
+
+
+    def start_schedule(self, host=DEFAULT_HOST):
+        """
+        Start the currently loaded schedule
+        """
+
+        url = host + '/start_schedule'
+        req = urllib2.Request(url, data={},
+            headers={'Content-Type': 'application/json'})
+        f = urllib2.urlopen(req)
+        res = f.read()
+        f.close()
+        return json.loads(res)
+
+
+    def _stop_schedule(self, host=DEFAULT_HOST):
+        """
+        Stop the current schedule
+        """
+
+        url = host + '/stop_schedule'
+        req = urllib2.Request(url, data={},
+            headers={'Content-Type': 'application/json'})
+        f = urllib2.urlopen(req)
+        res = f.read()
+        f.close()
+        return json.loads(res)
+
+
     def _handler_command_autosample(self, *args, **kwargs):
         """ Start autosample mode """
 
-        #log.debug("_handler_command_autosample")
+        log.debug("_handler_command_autosample")
         next_state = None
         next_agent_state = None
         result = None
 
-        self._do_cmd_no_resp(Command.START_AUTOSAMPLE)
+        host_ip_address = self._param_dict.get_config_value(Parameter.FTP_IP_ADDRESS)
+        host = 'https://' + host_ip_address
+
+        # Generate the schedule.ymal file
+        schedule_file = self._create_schedule_file()
+
+        # Upload the schedule ymal file to the server via ftp
+        self._ftp_config_file(schedule_file, ZPLSC_CONFIG_FILE_NAME)
+        schedule_file.close()
+
+        # Load the schedule file
+        self.load_schedule(ZPLSC_CONFIG_FILE_NAME, host)
+
+        # Start the schedule
+        self.start_schedule(host)
+
+        #self._do_cmd_no_resp(Command.START_AUTOSAMPLE)
 
         next_state = ProtocolState.AUTOSAMPLE
         next_agent_state = ResourceAgentState.STREAMING
 
         return (next_state, (next_agent_state, result))
+
+    def _handler_command_acquire_status(self, *args, **kwargs):
+        """ Acquire status from the instrument"""
+
+        log.debug("_handler_command_acquire_status")
+
+        next_state = None
+        next_agent_state = None
+        result = None
+
+        host_ip_address = self._param_dict.get_config_value(Parameter.FTP_IP_ADDRESS)
+        host = 'https://' + host_ip_address
+
+        url = host + '/status.json'
+        req = urllib2.Request(url)
+        f = urllib2.urlopen(req)
+        res = f.read()
+        f.close()
+        response = json.loads(res)
+        #result = self._parse_status_response(response)
+
+        particle = ZPLSCStatusParticle(response, port_timestamp=self._param_dict.get_current_timestamp())
+        self._driver_event(DriverAsyncEvent.SAMPLE, particle.generate())
+
+        return (next_state, (next_agent_state, result))
+
+
+    def _parse_status_response(self, response):
+        """
+        Parse ZPLSC Status response and return the ZPLSC Status particles
+        @throws SampleException If there is a problem with sample
+
+        example of ZPLSC Status:
+        {
+        "schedule_filename": "qct_configuration_example_1.yaml",
+        "schedule": {
+            "max_file_size": 52428800,
+            "intervals": [
+                {
+                    "max_range": 220,
+                    "start_at": "00:00",
+                    "name": "constant_active",
+                    "interval": 1000,
+                    "frequency": {
+                        "38000": {
+                            "bandwidth": 2425.15,
+                            "pulse_length": 1024,
+                            "mode": "active",
+                            "power": 500,
+                            "sample_interval": 256
+                        },
+                        "120000": {
+                            "bandwidth": 8709.93,
+                            "pulse_length": 256,
+                            "mode": "active",
+                            "power": 100,
+                            "sample_interval": 64
+                        },
+                        "200000": {
+                            "bandwidth": 10635,
+                            "pulse_length": 256,
+                            "mode": "active",
+                            "power": 120,
+                            "sample_interval": 64
+                        }
+                    },
+                    "duration": "00:01:30",
+                    "stop_repeating_at": "23:55",
+                    "type": "constant"
+                }
+            ],
+            "file_path": "QCT_1",
+            "file_prefix": "OOI"
+        },
+        "er60_channels": {
+            "GPT 200 kHz 00907207b7b1 6-2 OOI38|200": {
+                "pulse_length": 0.000256,
+                "frequency": 200000,
+                "sample_interval": 0.000064,
+                "power": 25,
+                "mode": "passive"
+            },
+            "GPT 120 kHz 00907207b7dc 1-1 ES120-7CD": {
+                "pulse_length": 0.000256,
+                "frequency": 120000,
+                "sample_interval": 0.000064,
+                "power": 25,
+                "mode": "passive"
+            },
+            "GPT  38 kHz 00907207b7b1 6-1 OOI.38|200": {
+                "pulse_length": 0.001024,
+                "frequency": 38000,
+                "sample_interval": 0.000256,
+                "power": 100,
+                "mode": "passive"
+            }
+        },
+        "gpts_enabled": false,
+        "er60_status": {
+            "executable": "c:/users/ooi/desktop/er60.lnk",
+            "current_utc_time": "2014-05-28 21:31:44.929000",
+            "current_running_interval": null,
+            "pid": 3560,
+            "host": "157.237.15.100",
+            "scheduled_intervals_remaining": 96,
+            "next_scheduled_interval": "2014-05-28 00:00:00.000000",
+            "raw_output": {
+                "max_file_size": 52428800,
+                "sample_range": 30,
+                "file_prefix": "OOI",
+                "save_raw": true,
+                "current_raw_filesize": null,
+                "save_index": true,
+                "save_bottom": true,
+                "current_raw_filename": "OOI-D20140527-T110604.raw",
+                "file_path": "D:\\data\\QCT_3"
+            },
+            "fs_root": "D:/",
+            "port": 52890
+        },
+        "connected": true
+        }
+        """
+
+        # config = json.loads(self.raw_data)
+        # if not isinstance(config, dict):
+        #        raise SampleException("ZPLSC status data is not a dictionary" %
+        #                           self.raw_data)
+        #
+        # try:
+        #     config = json.loads(self.raw_data)
+        #
+        #     connected = config[CONNECTED]
+        #     for key in config[ER60_CHANNELS]:
+        #         if '200 kHz' in key:
+        #             active_200k_mode = config[ER60_CHANNELS][key][MODE]
+        #             active_200k_power = config[ER60_CHANNELS][key][POWER]
+        #             active_200k_pulse_length = config[ER60_CHANNELS][key][PULSE_LENGTH]
+        #             active_200k_sample_interval = config[ER60_CHANNELS][key][SAMPLE_INTERVAL]
+        #         elif '120 kHz' in key:
+        #             active_120k_mode = config[ER60_CHANNELS][key][MODE]
+        #             active_120k_power = config[ER60_CHANNELS][key][POWER]
+        #             active_120k_pulse_length = config[ER60_CHANNELS][key][PULSE_LENGTH]
+        #             active_120k_sample_interval = config[ER60_CHANNELS][key][SAMPLE_INTERVAL]
+        #         elif '38 kHz' in key:
+        #             active_38k_mode = config[ER60_CHANNELS][key][MODE]
+        #             active_38k_power = config[ER60_CHANNELS][key][POWER]
+        #             active_38k_pulse_length = config[ER60_CHANNELS][key][PULSE_LENGTH]
+        #             active_38k_sample_interval = config[ER60_CHANNELS][key][SAMPLE_INTERVAL]
+        #
+        #
+        #     er60_status = config[ER60_STATUS]
+        #     current_utc_time = er60_status[CURRENT_UTC_TIME]
+        #     executable = er60_status[EXECUTABLE]
+        #     fs_root = er60_status[FS_ROOT]
+        #     next_scheduled_interval = er60_status[NEXT_SCHEDULED_INTERVAL]
+        #     host = er60_status[HOST]
+        #     pid = er60_status[PID]
+        #     #port = er60_status[PORT]
+        #
+        #     raw_output = config[ER60_STATUS][RAW_OUTPUT]
+        #     current_raw_filename = raw_output[CURRENT_RAW_FILENAME]
+        #     current_raw_filesize = raw_output[CURRENT_RAW_FILESIZE]
+        #     file_path = raw_output[FILE_PATH]
+        #     file_prefix = raw_output[FILE_PREFIX]
+        #     max_file_size = raw_output[MAX_FILE_SIZE]
+        #     sample_range = raw_output[SAMPLE_RANGE]
+        #     save_bottom = raw_output[SAVE_BOTTOM]
+        #     save_index = raw_output[SAVE_INDEX]
+        #     save_raw = raw_output[SAVE_RAW]
+        #     scheduled_interval_remaining = er60_status[SCHEDULED_INTERVAL_REMAINING]
+        #     gpts_enabled = config[GPTS_ENABLED]
+        #     schedule_filename = config[SCHEDULE_FILENAME]
+        #
+        #     # intervals = []
+        #     # for each in config['schedule']['intervals']:
+        #     #     d = {}
+        #     #     d[ZPLSCStatusParticleKey.FREQ_38K_MODE] = each['frequency']['38000']['mode']
+        #     #     intervals.append(d)
+        #     #
+        #     # for index, each in enumerate(intervals):
+        #     #     for key, value in each.iteritems:
+        #     #         value_id = '%s_%d' % (key, index)
+        #     #         result.append({DataParticleKey.VALUE_ID: value_id, DataParticleKey.VALUE: value})
+        #
+        #
+        # except KeyError:
+        #      raise SampleException("ValueError while converting ZPLSC Status: [%s]" %
+        #                           self.raw_data)
+        #
+        # result = [{DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_MODE,
+        #            DataParticleKey.VALUE: active_200k_mode},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_POWER,
+        #            DataParticleKey.VALUE: active_200k_power},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_PULSE_LENGTH,
+        #             DataParticleKey.VALUE: active_200k_pulse_length},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL,
+        #            DataParticleKey.VALUE: active_200k_sample_interval},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_MODE,
+        #            DataParticleKey.VALUE: active_120k_mode},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_POWER,
+        #            DataParticleKey.VALUE: active_120k_power},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_PULSE_LENGTH,
+        #             DataParticleKey.VALUE: active_120k_pulse_length},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_SAMPLE_INTERVAL,
+        #            DataParticleKey.VALUE: active_120k_sample_interval},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_POWER,
+        #            DataParticleKey.VALUE: active_120k_power},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_PULSE_LENGTH,
+        #             DataParticleKey.VALUE: active_38k_pulse_length},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_SAMPLE_INTERVAL,
+        #            DataParticleKey.VALUE: active_38k_sample_interval},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CURRENT_UTC_TIME,
+        #            DataParticleKey.VALUE: current_utc_time},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_EXECUTABLE,
+        #            DataParticleKey.VALUE: executable},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_FS_ROOT,
+        #            DataParticleKey.VALUE: fs_root},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_NEXT_SCHEDULED_INTERVAL,
+        #            DataParticleKey.VALUE: next_scheduled_interval},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_HOST,
+        #            DataParticleKey.VALUE: host},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_PID,
+        #            DataParticleKey.VALUE: pid},
+        #           #{DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_PORT,
+        #           #DataParticleKey.VALUE: port},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILENAME,
+        #            DataParticleKey.VALUE: current_raw_filename},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILESIZE,
+        #            DataParticleKey.VALUE: current_raw_filesize},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_FILE_PATH,
+        #            DataParticleKey.VALUE: file_path},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_FILE_PREFIX,
+        #            DataParticleKey.VALUE: file_prefix},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_MAX_FILE_SIZE,
+        #            DataParticleKey.VALUE: max_file_size},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAMPLE_RANGE,
+        #            DataParticleKey.VALUE: sample_range},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAVE_BOTTOM,
+        #            DataParticleKey.VALUE: save_bottom},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAVE_INDEX,
+        #            DataParticleKey.VALUE: save_index},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAVE_RAW,
+        #            DataParticleKey.VALUE: save_raw},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SCHEDULED_INTERVAL_REMAINING,
+        #            DataParticleKey.VALUE: scheduled_interval_remaining},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_GPTS_ENABLED,
+        #            DataParticleKey.VALUE: gpts_enabled},
+        #           {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SCHEDULE_FILENAME,
+        #            DataParticleKey.VALUE: schedule_filename}]
+        result = ' '
+        return result
 
 
     ########################################################################
@@ -979,7 +1787,13 @@ class Protocol(CommandResponseInstrumentProtocol):
         next_agent_state = None
         result = None
 
-        self._do_cmd_no_resp(Command.STOP_AUTOSAMPLE)
+
+        host_ip_address = self._param_dict.get_config_value(Parameter.FTP_IP_ADDRESS)
+        host = 'https://' + host_ip_address
+
+        self._stop_schedule(host)
+
+        #self._do_cmd_no_resp(Command.STOP_AUTOSAMPLE)
 
         next_state = ProtocolState.COMMAND
         next_agent_state = ResourceAgentState.COMMAND
