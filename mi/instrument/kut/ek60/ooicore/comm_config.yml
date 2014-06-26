@@ -1,7 +1,7 @@
 comm:
   command_port: 6002
   data_port: 6001
-  device_addr: 10.11.12.13
+  device_addr: 128.193.64.201
   device_port: 6002
   host: localhost
   method: ethernet
