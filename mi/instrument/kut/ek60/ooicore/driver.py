@@ -43,7 +43,71 @@ from mi.core.instrument.chunker import StringChunker
 
 
 # Default Instrument's IP Address
-DEFAULT_HOST = "https://10.33.10.143"
+DEFAULT_HOST = "https://128.193.64.201"
+
+DEFAULT_CONFIG = {
+            'file_prefix':    "DEFAULT",
+            'file_path':      "DEFAULT",  #relative to filesystem_root/data
+            'max_file_size':   52428800,  #50MB in bytes:  50 * 1024 * 1024
+
+            'intervals': {
+                'name': "default",
+                'type': "constant",
+                'start_at': "00:00",
+                'duration': "00:15:00",
+                'repeat_every': "01:00",
+                'stop_repeating_at': "23:55",
+                'interval': 1000,
+                'max_range': 80,
+                'frequency': {
+                    38000: {
+                        'mode': active,
+                        'power': 100,
+                        'pulse_length': 256,
+                        },
+                    120000: {
+                        'mode': active,
+                        'power': 100,
+                        'pulse_length': 64,
+                        },
+                    200000: {
+                        'mode': active,
+                        'power': 120,
+                        'pulse_length': 64,
+                        },
+                    }
+            }
+        }
+
+DEFAULT_YAML = "# Default configuration file \
+--- \
+file_prefix:    \"DEFAULT" \
+file_path:      \"DEFAULT"       #relative to filesystem_root/data \
+max_file_size:   52428800       #50MB in bytes:  50 * 1024 * 1024
+
+intervals: \
+
+    name: \"default\" \
+    type: \"constant\" \
+    start_at:  \"00:00\" \
+    duration:  \"00:15:00\" \
+    repeat_every:   \"01:00\" \
+    stop_repeating_at: \"23:55\" \
+    interval:   1000 \
+    max_range:  80 \
+            frequency: \
+          38000: \
+              mode:   active \
+              power:  100 \
+              pulse_length:   256 \
+          120000: \
+              mode:   active \
+              power:  100 \
+              pulse_length:   64 \
+          200000: \
+              mode:   active \
+              power:  120 \
+              pulse_length:   64"
 
 # Config file name to be stored on the instrument server
 ZPLSC_CONFIG_FILE_NAME = "zplsc_config.ymal"
@@ -153,25 +217,26 @@ class Parameter(DriverParameter):
     """
     Device specific parameters.
     """
+    SCHEDULE = "schedule"
     NAME = "name"
-    TYPE = "type"
-    START_AT = "start_at"
-    DURATION = "duration"
-    REPEAT_EVERY = "repeat_every"
-    STOP_REPEATING_AT = "stop_repeating_at"
-    INTERVAL = "interval"
-    MAX_RANGE = "max_range"
-    MINIMUM_INTERVAL = "minimum_interval"
-    NUMBER = "number"
-    FREQ_38K_MODE = "freq_38k_mode"
-    FREQ_38K_POWER = "freq_38k_power"
-    FREQ_38K_PULSE_LENGTH = "freq_38k_Pulse_length"
-    FREQ_120K_MODE = "freq_120k_mode"
-    FREQ_120K_POWER = "freq_120k_power"
-    FREQ_120K_PULSE_LENGTH = "freq_120k_Pulse_length"
-    FREQ_200K_MODE = "freq_200k_mode"
-    FREQ_200K_POWER = "freq_200k_power"
-    FREQ_200K_PULSE_LENGTH = "freq_200k_Pulse_length"
+    # TYPE = "type"
+    # START_AT = "start_at"
+    # DURATION = "duration"
+    # REPEAT_EVERY = "repeat_every"
+    # STOP_REPEATING_AT = "stop_repeating_at"
+    # INTERVAL = "interval"
+    # MAX_RANGE = "max_range"
+    # MINIMUM_INTERVAL = "minimum_interval"
+    # NUMBER = "number"
+    # FREQ_38K_MODE = "freq_38k_mode"
+    # FREQ_38K_POWER = "freq_38k_power"
+    # FREQ_38K_PULSE_LENGTH = "freq_38k_Pulse_length"
+    # FREQ_120K_MODE = "freq_120k_mode"
+    # FREQ_120K_POWER = "freq_120k_power"
+    # FREQ_120K_PULSE_LENGTH = "freq_120k_Pulse_length"
+    # FREQ_200K_MODE = "freq_200k_mode"
+    # FREQ_200K_POWER = "freq_200k_power"
+    # FREQ_200K_PULSE_LENGTH = "freq_200k_Pulse_length"
     FTP_IP_ADDRESS = "ftp_ip_address"
     #FTP_PORT_NUMBER = "ftp_port_number"
 
@@ -701,214 +766,226 @@ class Protocol(CommandResponseInstrumentProtocol):
         For each parameter key, add match string, match lambda function,
         and value formatting function for set commands.
         """
-        self._param_dict.add(Parameter.NAME,
-                             r'name:\s+(\w+)',
+
+        self._param_dict.add(Parameter.SCHEDULE,
+                             r'schedule:\s+(.*)',
                              lambda match : match.group(1),
                              str,
                              type=ParameterDictType.STRING,
-                             display_name="Name",
+                             display_name="Schedule",
                              startup_param = True,
                              direct_access = False,
-                             default_value = "constant",
+                             default_value = yaml.dump(DEFAULT_CONFIG, default_flow_style=False),
                              visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.TYPE,
-                             r'type:\s+\"(\w+)\" ',
-                             lambda match : match.group(1),
-                             self.__str__(),
-                             type=ParameterDictType.STRING,
-                             display_name="Type",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = "constant",
-                             visibility=ParameterDictVisibility.READ_WRITE)
+        # self._param_dict.add(Parameter.NAME,
+        #                      r'name:\s+(\w+)',
+        #                      lambda match : match.group(1),
+        #                      str,
+        #                      type=ParameterDictType.STRING,
+        #                      display_name="Name",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = "constant",
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.START_AT,
-                             r'start_at:\s+\"(\w+)\" ',
-                             lambda match : match.group(1),
-                             self.__str__(),
-                             type=ParameterDictType.STRING,
-                             display_name="Start At",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = "00:00",
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.DURATION,
-                             r'duration:\s+(\d\d:\d\d:\d\d)',
-                             lambda match : match.group(1),
-                             self.__str__(),
-                             type=ParameterDictType.STRING,
-                             display_name="Duration",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = "00:15:00",
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.REPEAT_EVERY,
-                             r'repeat_every:\s+(\d\d:\d\d-\d\d:\d\d)',
-                             lambda match :match.group(1),
-                             self.__str__(),
-                             type=ParameterDictType.FLOAT,
-                             display_name="Repeat Every",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = "01:00",
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.STOP_REPEATING_AT,
-                             r'stop_repeating_at:\s+(\d\d:\d\d-\d\d:\d\d)',
-                             lambda match : match.group(1),
-                             self.__str__(),
-                             type=ParameterDictType.STRING,
-                             display_name="Stop Repeat At",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = "23:55",
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.INTERVAL,
-                             r'interval:\s+(\w+)',
-                             lambda match : match.group(1),
-                             self._int_to_string(),
-                             type=ParameterDictType.INT,
-                             display_name="Interval",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = 1000,
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.MAX_RANGE,
-                             r'max_range:\s+(\d+)',
-                             lambda match : match.group(1),
-                             self._int_to_string(),
-                             type=ParameterDictType.INT,
-                             display_name="Max Range",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = 80,
-                             visibility=ParameterDictVisibility.IMMUTABLE)
-
-        self._param_dict.add(Parameter.MINIMUM_INTERVAL,
-                             r'minimum_interval:\s+(\d+)',
-                             lambda match : match.group(1),
-                             self._float_to_string,
-                             type=ParameterDictType.INT,
-                             display_name="Minimum Interval",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = 0,
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.NUMBER,
-                             r'number:\s+(\d+)',
-                             lambda match : match.group(1),
-                             self._int_to_string(),
-                             type=ParameterDictType.INT,
-                             display_name="Number",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = 0,
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FREQ_38K_MODE,
-                             r'number:\s+(\w+)',
-                             lambda match : match.group(1),
-                             self._int_to_string(),
-                             type=ParameterDictType.STRING,
-                             display_name="Freq 38K Mode",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = "active",
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FREQ_38K_POWER,
-                             r'number:\s+(\d+)',
-                             lambda match : True if match.group(1) == 'yes' else False,
-                             self._int_to_string,
-                             type=ParameterDictType.INT,
-                             display_name="Freq 38K Power",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = 100,
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FREQ_38K_PULSE_LENGTH,
-                             r'pulse_length:\s+(\d+)',
-                             lambda match : match.group(1),
-                             self._int_to_string,
-                             type=ParameterDictType.INT,
-                             display_name="Freq 38K Pulse Length",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = 256,
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FREQ_120K_MODE,
-                             r'mode:\s+(\w+)',
-                             lambda match : match.group(1),
-                             self._int_to_string(),
-                             type=ParameterDictType.STRING,
-                             display_name="Freq 120K Mode",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = "active",
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FREQ_120K_POWER,
-                             r'power:\s+(\d+)',
-                             lambda match : match.group(1),
-                             self._int_to_string,
-                             type=ParameterDictType.INT,
-                             display_name="Freq 120K Power",
-                             startup_param = True,
-                             direct_access = True,
-                             default_value = 100,
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FREQ_120K_PULSE_LENGTH,
-                             r'pulse_length:\s+(\d+)',
-                             lambda match : match.group(1),
-                             self._int_to_string,
-                             type=ParameterDictType.INT,
-                             display_name="Freq 120K Pulse Length",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = 64,
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FREQ_200K_MODE,
-                             r'mode:\s+(\w+)',
-                             lambda match : match.group(1),
-                             self._int_to_string(),
-                             type=ParameterDictType.STRING,
-                             display_name="Freq 200K Mode",
-                             startup_param = True,
-                             direct_access = False,
-                             default_value = "active",
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FREQ_200K_POWER,
-                             r'power:\s+(\d+)',
-                             lambda match : match.group(1),
-                             self._int_to_string,
-                             type=ParameterDictType.INT,
-                             display_name="Freq 200K Power",
-                             startup_param = True,
-                             direct_access = True,
-                             default_value = 100,
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FREQ_200K_PULSE_LENGTH,
-                             r'pulse_length:\s+(\d+)',
-                             lambda match : match.group(1),
-                             self._int_to_string,
-                             type=ParameterDictType.INT,
-                             display_name="Freq 200K Pulse Length",
-                             startup_param = True,
-                             direct_access = True,
-                             default_value = 256,
-                             visibility=ParameterDictVisibility.READ_WRITE)
+        # self._param_dict.add(Parameter.TYPE,
+        #                      r'type:\s+\"(\w+)\" ',
+        #                      lambda match : match.group(1),
+        #                      self.__str__(),
+        #                      type=ParameterDictType.STRING,
+        #                      display_name="Type",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = "constant",
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.START_AT,
+        #                      r'start_at:\s+\"(\w+)\" ',
+        #                      lambda match : match.group(1),
+        #                      self.__str__(),
+        #                      type=ParameterDictType.STRING,
+        #                      display_name="Start At",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = "00:00",
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.DURATION,
+        #                      r'duration:\s+(\d\d:\d\d:\d\d)',
+        #                      lambda match : match.group(1),
+        #                      self.__str__(),
+        #                      type=ParameterDictType.STRING,
+        #                      display_name="Duration",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = "00:15:00",
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.REPEAT_EVERY,
+        #                      r'repeat_every:\s+(\d\d:\d\d-\d\d:\d\d)',
+        #                      lambda match :match.group(1),
+        #                      self.__str__(),
+        #                      type=ParameterDictType.FLOAT,
+        #                      display_name="Repeat Every",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = "01:00",
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.STOP_REPEATING_AT,
+        #                      r'stop_repeating_at:\s+(\d\d:\d\d-\d\d:\d\d)',
+        #                      lambda match : match.group(1),
+        #                      self.__str__(),
+        #                      type=ParameterDictType.STRING,
+        #                      display_name="Stop Repeat At",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = "23:55",
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.INTERVAL,
+        #                      r'interval:\s+(\w+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string(),
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Interval",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = 1000,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.MAX_RANGE,
+        #                      r'max_range:\s+(\d+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string(),
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Max Range",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = 80,
+        #                      visibility=ParameterDictVisibility.IMMUTABLE)
+        #
+        # self._param_dict.add(Parameter.MINIMUM_INTERVAL,
+        #                      r'minimum_interval:\s+(\d+)',
+        #                      lambda match : match.group(1),
+        #                      self._float_to_string,
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Minimum Interval",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = 0,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.NUMBER,
+        #                      r'number:\s+(\d+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string(),
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Number",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = 0,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.FREQ_38K_MODE,
+        #                      r'number:\s+(\w+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string(),
+        #                      type=ParameterDictType.STRING,
+        #                      display_name="Freq 38K Mode",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = "active",
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.FREQ_38K_POWER,
+        #                      r'number:\s+(\d+)',
+        #                      lambda match : True if match.group(1) == 'yes' else False,
+        #                      self._int_to_string,
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Freq 38K Power",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = 100,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.FREQ_38K_PULSE_LENGTH,
+        #                      r'pulse_length:\s+(\d+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string,
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Freq 38K Pulse Length",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = 256,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.FREQ_120K_MODE,
+        #                      r'mode:\s+(\w+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string(),
+        #                      type=ParameterDictType.STRING,
+        #                      display_name="Freq 120K Mode",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = "active",
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.FREQ_120K_POWER,
+        #                      r'power:\s+(\d+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string,
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Freq 120K Power",
+        #                      startup_param = True,
+        #                      direct_access = True,
+        #                      default_value = 100,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.FREQ_120K_PULSE_LENGTH,
+        #                      r'pulse_length:\s+(\d+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string,
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Freq 120K Pulse Length",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = 64,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.FREQ_200K_MODE,
+        #                      r'mode:\s+(\w+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string(),
+        #                      type=ParameterDictType.STRING,
+        #                      display_name="Freq 200K Mode",
+        #                      startup_param = True,
+        #                      direct_access = False,
+        #                      default_value = "active",
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.FREQ_200K_POWER,
+        #                      r'power:\s+(\d+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string,
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Freq 200K Power",
+        #                      startup_param = True,
+        #                      direct_access = True,
+        #                      default_value = 100,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
+        #
+        # self._param_dict.add(Parameter.FREQ_200K_PULSE_LENGTH,
+        #                      r'pulse_length:\s+(\d+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string,
+        #                      type=ParameterDictType.INT,
+        #                      display_name="Freq 200K Pulse Length",
+        #                      startup_param = True,
+        #                      direct_access = True,
+        #                      default_value = 256,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
 
         self._param_dict.add(Parameter.FTP_IP_ADDRESS,
                              r'ftp address:\s+(\d\d\d\d.\d\d\d\d.\d\d\d\d.\d\d\d)',
@@ -1001,7 +1078,11 @@ class Protocol(CommandResponseInstrumentProtocol):
         }
 
         config_file = tempfile.TemporaryFile()
-        config_file.write(yaml.dump(config, default_flow_style=False))
+        #config_file.write(yaml.dump(config, default_flow_style=False))
+
+        config_file.write(ymal.dump(ymal.load(self._param_dict.get_config(Parameter.SCHEDULE)), default_flow_style=False))
+
+        #config_file.write(yaml.dump(ymal.load(CONFIG), default_flow_style=False))
 
 
         return config_file
@@ -1489,8 +1570,7 @@ class Protocol(CommandResponseInstrumentProtocol):
         """ Start autosample mode """
 
         log.debug("_handler_command_autosample")
-        next_state = None
-        next_agent_state = None
+
         result = None
 
         host_ip_address = self._param_dict.get_config_value(Parameter.FTP_IP_ADDRESS)
