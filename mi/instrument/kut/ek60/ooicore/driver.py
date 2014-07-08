@@ -7,6 +7,9 @@ Release notes:
 
 This Driver supports the Kongsberg UnderWater Technology's EK60 Instrument.
 """
+__author__ = 'Richard Han'
+__license__ = 'Apache 2.0'
+
 import ftplib
 import json
 import re
@@ -19,15 +22,17 @@ from mi.core.instrument.protocol_param_dict import ParameterDictVisibility, Para
 from mock import self
 import yaml
 
-__author__ = 'Richard Han'
-__license__ = 'Apache 2.0'
-
 import string
 
-from mi.core.log import get_logger ; log = get_logger()
+from mi.core.log import get_logger
+from mi.core.log import get_logging_metaclass
+
+log = get_logger()
 
 from mi.core.common import BaseEnum
 from mi.core.exceptions import SampleException
+from mi.core.exceptions import InstrumentProtocolException
+
 from mi.core.instrument.instrument_protocol import CommandResponseInstrumentProtocol
 from mi.core.instrument.instrument_fsm import InstrumentFSM, ThreadSafeFSM
 from mi.core.instrument.instrument_driver import SingleConnectionInstrumentDriver
@@ -44,6 +49,7 @@ from mi.core.instrument.chunker import StringChunker
 
 # Default Instrument's IP Address
 DEFAULT_HOST = "https://128.193.64.201"
+DEFAULT_YAML_FILE = "driver_configuration.yaml"
 
 DEFAULT_CONFIG = {
             'file_prefix':    "DEFAULT",
@@ -61,17 +67,17 @@ DEFAULT_CONFIG = {
                 'max_range': 80,
                 'frequency': {
                     38000: {
-                        'mode': active,
+                        'mode': 'active',
                         'power': 100,
                         'pulse_length': 256,
                         },
                     120000: {
-                        'mode': active,
+                        'mode': 'active',
                         'power': 100,
                         'pulse_length': 64,
                         },
                     200000: {
-                        'mode': active,
+                        'mode': 'active',
                         'power': 120,
                         'pulse_length': 64,
                         },
@@ -81,12 +87,10 @@ DEFAULT_CONFIG = {
 
 DEFAULT_YAML = "# Default configuration file \
 --- \
-file_prefix:    \"DEFAULT" \
-file_path:      \"DEFAULT"       #relative to filesystem_root/data \
-max_file_size:   52428800       #50MB in bytes:  50 * 1024 * 1024
-
+file_prefix:    \"DEFAULT\" \
+file_path:      \"DEFAULT\" \
+max_file_size:   52428800 \
 intervals: \
-
     name: \"default\" \
     type: \"constant\" \
     start_at:  \"00:00\" \
@@ -161,6 +165,7 @@ USER_NAME = "ooi"
 PASSWORD = "994ef22"
 
 
+
 # default timeout.
 TIMEOUT = 10
 
@@ -196,7 +201,6 @@ class ProtocolEvent(BaseEnum):
     DISCOVER = DriverEvent.DISCOVER
     START_DIRECT = DriverEvent.START_DIRECT
     STOP_DIRECT = DriverEvent.STOP_DIRECT
-    ACQUIRE_SAMPLE = DriverEvent.ACQUIRE_SAMPLE
     START_AUTOSAMPLE = DriverEvent.START_AUTOSAMPLE
     STOP_AUTOSAMPLE = DriverEvent.STOP_AUTOSAMPLE
     EXECUTE_DIRECT = DriverEvent.EXECUTE_DIRECT
@@ -207,18 +211,21 @@ class Capability(BaseEnum):
     """
     Protocol events that should be exposed to users (subset of above).
     """
-    ACQUIRE_SAMPLE = ProtocolEvent.ACQUIRE_SAMPLE
     START_AUTOSAMPLE = ProtocolEvent.START_AUTOSAMPLE
     STOP_AUTOSAMPLE = ProtocolEvent.STOP_AUTOSAMPLE
-    CLOCK_SYNC = ProtocolEvent.CLOCK_SYNC
+    START_DIRECT = ProtocolEvent.START_DIRECT
+    EXECUTE_DIRECT = ProtocolEvent.EXECUTE_DIRECT
+    STOP_DIRECT = ProtocolEvent.STOP_DIRECT
     ACQUIRE_STATUS  = ProtocolEvent.ACQUIRE_STATUS
+    GET = ProtocolEvent.GET
+    SET = ProtocolEvent.SET
 
 class Parameter(DriverParameter):
     """
     Device specific parameters.
     """
     SCHEDULE = "schedule"
-    NAME = "name"
+    # NAME = "name"
     # TYPE = "type"
     # START_AT = "start_at"
     # DURATION = "duration"
@@ -277,8 +284,8 @@ class ZPLSCStatusParticleKey(BaseEnum):
     ZPLSC_ACTIVE_120K_SAMPLE_INTERVAL = "zplcs_active_120k_sample_interval" # 120K Sample Interval
     ZPLSC_ACTIVE_200K_MODE = "zplcs_active_200k_mode"                       # 200K Transducer transmit mode
     ZPLSC_ACTIVE_200K_POWER = "zplcs_active_200k_power"                     # 200K Transducer transmit power in W
-    ZPLSC_ACTIVE_200K_PULSE_LENGTH = "zplcs_active_220k_pulse_length"       # 200K Transducer transmit pulse length in seconds
-    ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL = "zplcs_active_120k_sample_interval" # 200K Transducer sample interval
+    ZPLSC_ACTIVE_200K_PULSE_LENGTH = "zplcs_active_200k_pulse_length"       # 200K Transducer transmit pulse length in seconds
+    ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL = "zplcs_active_200k_sample_interval" # 200K Transducer sample interval
     ZPLSC_CURRENT_UTC_TIME = "zplcs_current_utc_time"                       # Current UTC Time
     ZPLSC_EXECUTABLE = "zplcs_executable"                                   # Executable used to launch ER60
     ZPLSC_FS_ROOT = "zplcs_fs_root"                                         # Root directory where data/logs/configs are stored
@@ -306,95 +313,43 @@ class ZPLSCStatusParticle(DataParticle):
     the building of values, and the rest should come along for free.
 
     Sample:
-    {
-    "schedule_filename": "qct_configuration_example_1.yaml",
-    "schedule": {
-        "max_file_size": 52428800,
-        "intervals": [
-            {
-                "max_range": 220,
-                "start_at": "00:00",
-                "name": "constant_active",
-                "interval": 1000,
-                "frequency": {
-                    "38000": {
-                        "bandwidth": 2425.15,
-                        "pulse_length": 1024,
-                        "mode": "active",
-                        "power": 500,
-                        "sample_interval": 256
-                    },
-                    "120000": {
-                        "bandwidth": 8709.93,
-                        "pulse_length": 256,
-                        "mode": "active",
-                        "power": 100,
-                        "sample_interval": 64
-                    },
-                    "200000": {
-                        "bandwidth": 10635,
-                        "pulse_length": 256,
-                        "mode": "active",
-                        "power": 120,
-                        "sample_interval": 64
-                    }
-                },
-                "duration": "00:01:30",
-                "stop_repeating_at": "23:55",
-                "type": "constant"
-            }
-        ],
-        "file_path": "QCT_1",
-        "file_prefix": "OOI"
-    },
-    "er60_channels": {
-        "GPT 200 kHz 00907207b7b1 6-2 OOI38|200": {
-            "pulse_length": 0.000256,
-            "frequency": 200000,
-            "sample_interval": 0.000064,
-            "power": 25,
-            "mode": "passive"
-        },
-        "GPT 120 kHz 00907207b7dc 1-1 ES120-7CD": {
-            "pulse_length": 0.000256,
-            "frequency": 120000,
-            "sample_interval": 0.000064,
-            "power": 25,
-            "mode": "passive"
-        },
-        "GPT  38 kHz 00907207b7b1 6-1 OOI.38|200": {
-            "pulse_length": 0.001024,
-            "frequency": 38000,
-            "sample_interval": 0.000256,
-            "power": 100,
-            "mode": "passive"
-        }
-    },
-    "gpts_enabled": false,
-    "er60_status": {
-        "executable": "c:/users/ooi/desktop/er60.lnk",
-        "current_utc_time": "2014-05-28 20:55:09.971000",
-        "current_running_interval": null,
-        "pid": 3560,
-        "host": "157.237.15.100",
-        "scheduled_intervals_remaining": 96,
-        "next_scheduled_interval": "2014-05-28 00:00:00.000000",
-        "raw_output": {
-            "max_file_size": 52428800,
-            "sample_range": 30,
-            "file_prefix": "OOI",
-            "save_raw": true,
-            "current_raw_filesize": null,
-            "save_index": true,
-            "save_bottom": true,
-            "current_raw_filename": "OOI-D20140527-T110604.raw",
-            "file_path": "D:\\data\\QCT_3"
-        },
-        "fs_root": "D:/",
-        "port": 52890
-    },
-    "connected": true
-    }
+    {'connected': True,
+     'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000,
+                                                                   'mode': 'active',
+                                                                   'power': 100.0,
+                                                                   'pulse_length': 0.000256,
+                                                                   'sample_interval': 6.4e-05},
+                       'GPT 120 kHz 00907207b7dc 1-1 ES120-7CD': {'frequency': 120000,
+                                                                  'mode': 'active',
+                                                                  'power': 100.0,
+                                                                  'pulse_length': 6.4e-05,
+                                                                  'sample_interval': 1.6e-05},
+                       'GPT 200 kHz 00907207b7b1 6-2 OOI38|200': {'frequency': 200000,
+                                                                  'mode': 'active',
+                                                                  'power': 120.0,
+                                                                  'pulse_length': 6.4e-05,
+                                                                  'sample_interval': 1.6e-05}},
+     'er60_status': {'current_running_interval': None,
+                     'current_utc_time': '2014-07-08 22:34:18.667000',
+                     'executable': 'c:/users/ooi/desktop/er60.lnk',
+                     'fs_root': 'D:/',
+                     'host': '157.237.15.100',
+                     'next_scheduled_interval': None,
+                     'pid': 1864,
+                     'port': 56635,
+                     'raw_output': {'current_raw_filename': 'OOI-D20140707-T214500.raw',
+                                    'current_raw_filesize': None,
+                                    'file_path': 'D:\\data\\QCT_1',
+                                    'file_prefix': 'OOI',
+                                    'max_file_size': 52428800,
+                                    'sample_range': 220.0,
+                                    'save_bottom': True,
+                                    'save_index': True,
+                                    'save_raw': True},
+                     'scheduled_intervals_remaining': 0},
+     'gpts_enabled': False,
+     'schedule': {},
+     'schedule_filename': 'qct_configuration_example_1.yaml'}
 
     """
     _data_particle_type = DataParticleType.ZPLSC_STATUS
@@ -679,6 +634,9 @@ class Protocol(CommandResponseInstrumentProtocol):
     Instrument protocol class
     Subclasses CommandResponseInstrumentProtocol
     """
+
+    __metaclass__ = get_logging_metaclass(log_level='debug')
+
     def __init__(self, prompts, newline, driver_event):
         """
         Protocol constructor.
@@ -724,15 +682,15 @@ class Protocol(CommandResponseInstrumentProtocol):
         # Add build handlers for device commands.
         self._add_build_handler(Command.GET, self._build_get_command)
         self._add_build_handler(Command.SET, self._build_set_command)
-        self._add_build_handler(Command.STATUS, self._build_status_command)
+        #self._add_build_handler(Command.STATUS, self._build_status_command)
 
 
         # Add response handlers for device commands.
         self._add_response_handler(Command.GET, self._parse_get_response)
         self._add_response_handler(Command.SET, self._parse_set_response)
-        self._add_response_handler(Command.STATUS, self._parse_status_response)
-        self._add_response_handler(Command.GET_SCHEDULE, self._parse_get_schedule)
-        self._add_response_handler(Command.LIST_SCHEDULE, self._parse_list_schedule)
+        #self._add_response_handler(Command.STATUS, self._parse_status_response)
+        #self._add_response_handler(Command.GET_SCHEDULE, self._parse_get_schedule)
+        #self._add_response_handler(Command.LIST_SCHEDULE, self._parse_list_schedule)
 
         # Add sample handlers.
 
@@ -743,10 +701,10 @@ class Protocol(CommandResponseInstrumentProtocol):
         self._sent_cmds = []
 
         #
-        self._chunker = StringChunker(Protocol.sieve_function)
+        self._chunker = StringChunker(self.sieve_function)
 
         schedule_file = self._create_schedule_file()
-        self._ftp_config_file(schedule_file)
+        self._ftp_config_file(schedule_file, DEFAULT_YAML_FILE)
         schedule_file.close()
 
 
@@ -756,7 +714,15 @@ class Protocol(CommandResponseInstrumentProtocol):
         The method that splits samples
         """
 
+        matchers = []
         return_list = []
+
+        matchers.append(ZPLSCStatusParticle.regex_compiled())
+
+        for matcher in matchers:
+            log.debug('matcher: %r raw_data: %r', matcher.pattern, raw_data)
+            for match in matcher.finditer(raw_data):
+                return_list.append((match.start(), match.end()))
 
         return return_list
 
@@ -776,6 +742,17 @@ class Protocol(CommandResponseInstrumentProtocol):
                              startup_param = True,
                              direct_access = False,
                              default_value = yaml.dump(DEFAULT_CONFIG, default_flow_style=False),
+                             visibility=ParameterDictVisibility.READ_WRITE)
+
+        self._param_dict.add(Parameter.FTP_IP_ADDRESS,
+                             r'ftp address:\s+(\d\d\d\d\.\d\d\d\d\.\d\d\d\d\.\d\d\d)',
+                             lambda match : match.group(1),
+                             self.__str__(),
+                             type=ParameterDictType.STRING,
+                             display_name="FTP Ip Address",
+                             startup_param = True,
+                             direct_access = True,
+                             default_value = "128.193.64.201",
                              visibility=ParameterDictVisibility.READ_WRITE)
 
         # self._param_dict.add(Parameter.NAME,
@@ -987,27 +964,16 @@ class Protocol(CommandResponseInstrumentProtocol):
         #                      default_value = 256,
         #                      visibility=ParameterDictVisibility.READ_WRITE)
 
-        self._param_dict.add(Parameter.FTP_IP_ADDRESS,
-                             r'ftp address:\s+(\d\d\d\d.\d\d\d\d.\d\d\d\d.\d\d\d)',
-                             lambda match : match.group(1),
-                             self.__str__(),
-                             type=ParameterDictType.STRING,
-                             display_name="FTP Ip Address",
-                             startup_param = True,
-                             direct_access = True,
-                             default_value = "10.33.10.143",
-                             visibility=ParameterDictVisibility.READ_WRITE)
-
-        self._param_dict.add(Parameter.FTP_PORT_NUMBER,
-                             r'ftp port:\s+(\d+)',
-                             lambda match : match.group(1),
-                             self._int_to_string(),
-                             type=ParameterDictType.INT,
-                             display_name="FTP Port Number",
-                             startup_param = True,
-                             direct_access = True,
-                             default_value = 21,
-                             visibility=ParameterDictVisibility.READ_WRITE)
+        # self._param_dict.add(Parameter.FTP_PORT_NUMBER,
+        #                      r'ftp port:\s+(\d+)',
+        #                      lambda match : match.group(1),
+        #                      self._int_to_string(),
+        #                      type=ParameterDictType.INT,
+        #                      display_name="FTP Port Number",
+        #                      startup_param = True,
+        #                      direct_access = True,
+        #                      default_value = 21,
+        #                      visibility=ParameterDictVisibility.READ_WRITE)
 
     def _create_schedule_file(self):
         """
@@ -1041,49 +1007,57 @@ class Protocol(CommandResponseInstrumentProtocol):
               power:  25
               pulse_length:   256
 
-
         """
-        config = {
-            'file_prefix':    "OOI",
-            'file_path':      "QCT_3",
-            'max_file_size':   52428800,
+        # config = {
+        #     'file_prefix':    "OOI",
+        #     'file_path':      "QCT_3",
+        #     'max_file_size':   52428800,
+        #
+        #     'intervals': {
+        #         'name': self._param_dict.get_config_value(Parameter.NAME),
+        #         'type': self._param_dict.get_config_value(Parameter.TYPE),
+        #         'start_at': self._param_dict.get_config_value(Parameter.START_AT),
+        #         'duration': self._param_dict.get_config_value(Parameter.DURATION),
+        #         'repeat_every': self._param_dict.get_config_value(Parameter.REPEAT_EVERY),
+        #         'stop_repeating_at': self._param_dict.get_config_value(Parameter.STOP_REPEATING_AT),
+        #         'interval': self._param_dict.get_config_value(Parameter.INTERVAL),
+        #         'max_range': self._param_dict.get_config_value(Parameter.REPEAT_EVERY),
+        #         'frequency': {
+        #             38000: {
+        #                 'mode': self._param_dict.get_config_value(Parameter.FREQUENCY_38K_MODE),
+        #                 'power': self._param_dict.get_config_value(Parameter.FREQUENCY_38K_POWER),
+        #                 'pulse_length': self._param_dict.get_config_value(Parameter.FREQUENCY_38K_PULSE_LENGTH),
+        #                 },
+        #             120000: {
+        #                 'mode': self._param_dict.get_config_value(Parameter.FREQUENCY_120K_MODE),
+        #                 'power': self._param_dict.get_config_value(Parameter.FREQUENCY_120K_POWER),
+        #                 'pulse_length':   self._param_dict.get_config_value(Parameter.FREQUENCY_120K_PULSE_LENGTH),
+        #                 },
+        #             200000: {
+        #                 'mode': self._param_dict.get_config_value(Parameter.FREQUENCY_200K_MODE),
+        #                 'power': self._param_dict.get_config_value(Parameter.FREQUENCY_200K_POWER),
+        #                 'pulse_length': self._param_dict.get_config_value(Parameter.FREQUENCY_200K_PULSE_LENGTH),
+        #                 },
+        #             }
+        #     }
+        # }
 
-            'intervals': {
-                'name': self._param_dict.get_config_value(Parameter.NAME),
-                'type': self._param_dict.get_config_value(Parameter.TYPE),
-                'start_at': self._param_dict.get_config_value(Parameter.START_AT),
-                'duration': self._param_dict.get_config_value(Parameter.DURATION),
-                'repeat_every': self._param_dict.get_config_value(Parameter.REPEAT_EVERY),
-                'stop_repeating_at': self._param_dict.get_config_value(Parameter.STOP_REPEATING_AT),
-                'interval': self._param_dict.get_config_value(Parameter.INTERVAL),
-                'max_range': self._param_dict.get_config_value(Parameter.REPEAT_EVERY),
-                'frequency': {
-                    38000: {
-                        'mode': self._param_dict.get_config_value(Parameter.FREQUENCY_38K_MODE),
-                        'power': self._param_dict.get_config_value(Parameter.FREQUENCY_38K_POWER),
-                        'pulse_length': self._param_dict.get_config_value(Parameter.FREQUENCY_38K_PULSE_LENGTH),
-                        },
-                    120000: {
-                        'mode': self._param_dict.get_config_value(Parameter.FREQUENCY_120K_MODE),
-                        'power': self._param_dict.get_config_value(Parameter.FREQUENCY_120K_POWER),
-                        'pulse_length':   self._param_dict.get_config_value(Parameter.FREQUENCY_120K_PULSE_LENGTH),
-                        },
-                    200000: {
-                        'mode': self._param_dict.get_config_value(Parameter.FREQUENCY_200K_MODE),
-                        'power': self._param_dict.get_config_value(Parameter.FREQUENCY_200K_POWER),
-                        'pulse_length': self._param_dict.get_config_value(Parameter.FREQUENCY_200K_PULSE_LENGTH),
-                        },
-                    }
-            }
-        }
+        try:
 
-        config_file = tempfile.TemporaryFile()
-        #config_file.write(yaml.dump(config, default_flow_style=False))
+            config_file = tempfile.TemporaryFile()
+            log.debug("temporary file created")
+            #config_file.write(yaml.dump(config, default_flow_style=False))
 
-        config_file.write(ymal.dump(ymal.load(self._param_dict.get_config(Parameter.SCHEDULE)), default_flow_style=False))
+            config = yaml.load(self._param_dict.get_config_value(Parameter.SCHEDULE))
+            log.debug("loaded schedule param")
+            config_file.write(yaml.dump(config, default_flow_style=False))
+            log.debug("writing yaml file: %s ", yaml.dump(config, default_flow_style=False))
+            log.debug("finished creating yaml file")
 
-        #config_file.write(yaml.dump(ymal.load(CONFIG), default_flow_style=False))
-
+            #config_file.write(yaml.dump(ymal.load(CONFIG), default_flow_style=False))
+        except Exception as err:
+            log.error("Create schedule yaml file exception :" + str(err))
+            raise err
 
         return config_file
 
@@ -1094,26 +1068,32 @@ class Protocol(CommandResponseInstrumentProtocol):
         """
 
         host = self._param_dict.get_config_value(Parameter.FTP_IP_ADDRESS)
-        port = self._param_dict.get_config_value(Parameter.FTP_PORT_NUMBER)
+        log.debug("Got host ip address %s ", host)
+        #port = self._param_dict.get_config_value(Parameter.FTP_PORT_NUMBER)
         #user_name = 'ooi'
         #password = '994ef22'
 
-        if ((config_file == None) or (not isinstance(config_file, tempfile))):
+        if ((config_file == None) or (not isinstance(config_file, file))):
             raise InstrumentException("config_file is not a tempfile!")
 
+        log.debug("finished checking the config file")
         try:
+            log.debug("Create a ftp session")
             ftp_session = ftplib.FTP(host, USER_NAME, PASSWORD)
+
+            log.debug("ftp session was created...")
+
+            # FTP the instrument's config file to the instrument sever
+            #ftp_session.storbinary('STOR %s ' % file_name, config_file)
+            ftp_session.storlines('STOR %s ' % file_name, config_file)
+            log.debug("*** Config ymal file sent")
+
+            ftp_session.quit()
 
         except (ftplib.socket.error, ftplib.socket.gaierror), e:
             log.error("ERROR: cannot reach FTP Host %s " % (host))
             return
-        log.debug("*** Connected to ftp host %s" % (host))
-
-        # FTP the instrument's config file to the instrument sever
-        ftp_session.storbinary('STOR %s ' % file_name, config_file)
-        log.debug("*** Config ymal file sent")
-
-        ftp_session.quit()
+        log.debug("*** FTP %s to ftp host %s successfully" % (file_name, host))
 
 
     # def _extract_xml_elements(self, node, tag, raise_exception_if_none_found=True):
@@ -1168,8 +1148,8 @@ class Protocol(CommandResponseInstrumentProtocol):
         """
         try:
 
-           if param == 'INTERVAL':
-               param = 'sampleinterval'
+           #if param == 'INTERVAL':
+           #    param = 'sampleinterval'
            #
            # param = "RemoteCommandDispatcher/ClientTimeoutLimit "
            # header = "REQ\0"
@@ -1341,11 +1321,13 @@ class Protocol(CommandResponseInstrumentProtocol):
         return response
 
 
-    def _got_chunk(self, chunk):
+    def _got_chunk(self, chunk, timestamp):
         """
         The base class got_data has gotten a chunk from the chunker.  Pass it to extract_sample
         with the appropriate particle objects and REGEXes.
         """
+        if not (self._extract_sample(ZPLSCStatusParticle, ZPLSCStatusParticle.regex_compiled(), chunk, timestamp)):
+             raise InstrumentProtocolException("Unhandled chunk")
 
 
     def _build_driver_dict(self):
@@ -1360,8 +1342,12 @@ class Protocol(CommandResponseInstrumentProtocol):
         """
         self._cmd_dict.add(Capability.START_AUTOSAMPLE, display_name="start autosample")
         self._cmd_dict.add(Capability.STOP_AUTOSAMPLE, display_name="stop autosample")
-        self._cmd_dict.add(Capability.GET_CONFIGURATION, display_name="get calibrations")
-
+        self._cmd_dict.add(Capability.GET, display_name="get")
+        self._cmd_dict.add(Capability.SET, display_name="set")
+        self._cmd_dict.add(Capability.START_DIRECT, display_name="start direct")
+        self._cmd_dict.add(Capability.STOP_DIRECT, display_name="stop direct")
+        self._cmd_dict.add(Capability.EXECUTE_DIRECT, display_name="execute direct")
+        self._cmd_dict.add(Capability.ACQUIRE_STATUS, display_name="acquire status")
 
     def _filter_capabilities(self, events):
         """
@@ -1483,6 +1469,19 @@ class Protocol(CommandResponseInstrumentProtocol):
         else:
             self._set_params(params, startup)
 
+            host_ip_address = self._param_dict.get_config_value(Parameter.FTP_IP_ADDRESS)
+            host = 'https://' + host_ip_address
+
+            # Generate the schedule.ymal file
+            schedule_file = self._create_schedule_file()
+
+            # Upload the schedule ymal file to the server via ftp
+            self._ftp_config_file(schedule_file, ZPLSC_CONFIG_FILE_NAME)
+            schedule_file.close()
+
+            # Load the schedule file
+            self.load_schedule(ZPLSC_CONFIG_FILE_NAME, host)
+
         return (next_state, result)
 
     def _set_params(self, *args, **kwargs):
@@ -1573,21 +1572,21 @@ class Protocol(CommandResponseInstrumentProtocol):
 
         result = None
 
-        host_ip_address = self._param_dict.get_config_value(Parameter.FTP_IP_ADDRESS)
-        host = 'https://' + host_ip_address
-
-        # Generate the schedule.ymal file
-        schedule_file = self._create_schedule_file()
-
-        # Upload the schedule ymal file to the server via ftp
-        self._ftp_config_file(schedule_file, ZPLSC_CONFIG_FILE_NAME)
-        schedule_file.close()
-
-        # Load the schedule file
-        self.load_schedule(ZPLSC_CONFIG_FILE_NAME, host)
-
-        # Start the schedule
-        self.start_schedule(host)
+        # host_ip_address = self._param_dict.get_config_value(Parameter.FTP_IP_ADDRESS)
+        # host = 'https://' + host_ip_address
+        #
+        # # Generate the schedule.ymal file
+        # schedule_file = self._create_schedule_file()
+        #
+        # # Upload the schedule ymal file to the server via ftp
+        # self._ftp_config_file(schedule_file, ZPLSC_CONFIG_FILE_NAME)
+        # schedule_file.close()
+        #
+        # # Load the schedule file
+        # self.load_schedule(ZPLSC_CONFIG_FILE_NAME, host)
+        #
+        # # Start the schedule
+        # self.start_schedule(host)
 
         #self._do_cmd_no_resp(Command.START_AUTOSAMPLE)
 
