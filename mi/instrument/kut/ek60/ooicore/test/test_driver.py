@@ -13,6 +13,7 @@ USAGE:
        $ bin/test_driver -q [-t testname]
 """
 from mi.core.instrument.data_particle import RawDataParticle
+from mi.instrument.uw.bars.ooicore.driver import BarsDataParticleKey
 
 __author__ = 'Richard Han'
 __license__ = 'Apache 2.0'
@@ -25,7 +26,7 @@ from mock import Mock
 from mi.core.log import get_logger ; log = get_logger()
 
 # MI imports.
-from mi.idk.unit_test import InstrumentDriverTestCase
+from mi.idk.unit_test import InstrumentDriverTestCase, ParameterTestConfigKey
 from mi.idk.unit_test import InstrumentDriverUnitTestCase
 from mi.idk.unit_test import InstrumentDriverIntegrationTestCase
 from mi.idk.unit_test import InstrumentDriverQualificationTestCase
@@ -36,14 +37,14 @@ from interface.objects import AgentCommand
 from mi.core.instrument.logger_client import LoggerClient
 
 from mi.core.instrument.chunker import StringChunker
-from mi.core.instrument.instrument_driver import DriverAsyncEvent
+from mi.core.instrument.instrument_driver import DriverAsyncEvent, DriverConfigKey
 from mi.core.instrument.instrument_driver import DriverConnectionState
 from mi.core.instrument.instrument_driver import DriverProtocolState
 
 from ion.agents.instrument.instrument_agent import InstrumentAgentState
 from ion.agents.instrument.direct_access.direct_access_server import DirectAccessTypes
 
-from mi.instrument.kut.ek60.ooicore.driver import InstrumentDriver
+from mi.instrument.kut.ek60.ooicore.driver import InstrumentDriver, ZPLSCStatusParticleKey
 from mi.instrument.kut.ek60.ooicore.driver import DataParticleType
 from mi.instrument.kut.ek60.ooicore.driver import Command
 from mi.instrument.kut.ek60.ooicore.driver import ProtocolState
@@ -65,7 +66,38 @@ InstrumentDriverTestCase.initialize(
     instrument_agent_name = 'kut_ek60_ooicore',
     instrument_agent_packet_config = DataParticleType(),
 
-    driver_startup_config = {}
+    driver_startup_config = {
+         DriverConfigKey.PARAMETERS : {
+                Parameter.FTP_IP_ADDRESS : '128.193.64.201',
+                Parameter.SCHEDULE : "# Default configuration file \
+--- \
+file_prefix:    \"DEFAULT\" \
+file_path:      \"DEFAULT\" \
+max_file_size:   52428800 \
+intervals: \
+    name: \"default\" \
+    type: \"constant\" \
+    start_at:  \"00:00\" \
+    duration:  \"00:15:00\" \
+    repeat_every:   \"01:00\" \
+    stop_repeating_at: \"23:55\" \
+    interval:   1000 \
+    max_range:  80 \
+            frequency: \
+          38000: \
+              mode:   active \
+              power:  100 \
+              pulse_length:   256 \
+          120000: \
+              mode:   active \
+              power:  100 \
+              pulse_length:   64 \
+          200000: \
+              mode:   active \
+              power:  120 \
+              pulse_length:   64",
+        }
+    }
 )
 
 #################################### RULES ####################################
@@ -98,17 +130,143 @@ InstrumentDriverTestCase.initialize(
 # methods for validating data particles.									  #
 ###############################################################################
 class DriverTestMixinSub(DriverTestMixin):
-    def assertSampleDataParticle(self, data_particle):
+
+    """
+    Mixin class used for storing data particle constants and common data assertion methods.
+    """
+
+    InstrumentDriver = InstrumentDriver
+    # Create some short names for the parameter test config
+
+    TYPE = ParameterTestConfigKey.TYPE
+    READONLY = ParameterTestConfigKey.READONLY
+    STARTUP = ParameterTestConfigKey.STARTUP
+    DA = ParameterTestConfigKey.DIRECT_ACCESS
+    VALUE = ParameterTestConfigKey.VALUE
+    REQUIRED = ParameterTestConfigKey.REQUIRED
+    DEFAULT = ParameterTestConfigKey.DEFAULT
+    STATES = ParameterTestConfigKey.STATES
+
+    INVALID_STATUS = "This is an invalid status; it had better cause an exception."
+    VALID_STATUS_01 = "{'connected': True, \
+                   'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000, \
+                                                               'mode': 'active', \
+                                                               'power': 100.0, \
+                                                               'pulse_length': 0.000256, \
+                                                               'sample_interval': 6.4e-05}, \
+                   'GPT 120 kHz 00907207b7dc 1-1 ES120-7CD': {'frequency': 120000, \
+                                                              'mode': 'active', \
+                                                              'power': 100.0, \
+                                                              'pulse_length': 6.4e-05, \
+                                                              'sample_interval': 1.6e-05}, \
+                   'GPT 200 kHz 00907207b7b1 6-2 OOI38|200': {'frequency': 200000, \
+                                                              'mode': 'active', \
+                                                              'power': 120.0, \
+                                                              'pulse_length': 6.4e-05, \
+                                                              'sample_interval': 1.6e-05}}, \
+                  'er60_status': {'current_running_interval': None, \
+                 'current_utc_time': '2014-07-01 17:59:34.419000', \
+                 'executable': 'c:/users/ooi/desktop/er60.lnk', \
+                 'fs_root': 'D:/', \
+                 'host': '157.237.15.100', \
+                 'next_scheduled_interval': None, \
+                 'pid': 1864, \
+                 'port': 56635, \
+                 'raw_output': {'current_raw_filename': 'OOI_BT-D20140619-T150820.raw', \
+                                'current_raw_filesize': None, \
+                                'file_path': 'D:\\data\\Bench_Test', \
+                                'file_prefix': 'OOI_BT', \
+                                'max_file_size': 52428800, \
+                                'sample_range': 80.0, \
+                                'save_bottom': True, \
+                                'save_index': True, \
+                                'save_raw': True}, \
+                 'scheduled_intervals_remaining': 0}, \
+                 'gpts_enabled': False, \
+                 'schedule': {}, \
+                 'schedule_filename': 'bench_test.yaml'}" + NEWLINE
+
+    _driver_capabilities = {
+        # capabilities defined in the IOS
+        Capability.START_AUTOSAMPLE: {STATES: [ProtocolState.COMMAND]},
+        Capability.STOP_AUTOSAMPLE: {STATES: [ProtocolState.AUTOSAMPLE]},
+        Capability.START_DIRECT: {STATES: [ProtocolState.COMMAND]},
+        Capability.EXECUTE_DIRECT: {STATES: [ProtocolState.DIRECT_ACCESS]},
+        Capability.STOP_DIRECT: {STATES: [ProtocolState.DIRECT_ACCESS]},
+        Capability.GET: {STATES: [ProtocolState.COMMAND, ProtocolState.AUTOSAMPLE]},
+        Capability.SET: {STATES: [ProtocolState.COMMAND]},
+        Capability.EXECUTE_DIRECT: {STATES: [ProtocolState.DIRECT_ACCESS]},
+        Capability.ACQUIRE_STATUS: {STATES: [ProtocolState.COMMAND]},
+    }
+
+    ###
+    #  Parameter and Type Definitions
+    ###
+
+    _driver_parameters = {
+        # Parameters defined in the IOS
+
+        Parameter.SCHEDULE: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: "Test", VALUE: "Test"},
+        Parameter.FTP_IP_ADDRESS: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: "128.193.64.201", VALUE: "128.193.64.201"},
+    }
+
+
+    _sample_parameters = {
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_MODE: {TYPE: str, VALUE: 'active', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_POWER: {TYPE: float, VALUE: 100.0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_PULSE_LENGTH: {TYPE: float, VALUE: 0.090, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 1.6e-05, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_MODE: {TYPE: str, VALUE: 'active', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_POWER: {TYPE: float, VALUE: 120.0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_PULSE_LENGTH: {TYPE: float, VALUE: 0.090, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 0.090, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_MODE: {TYPE: str, VALUE: 'active', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_POWER: {TYPE: float, VALUE: 100.0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_PULSE_LENGTH: {TYPE: float, VALUE: 0.000256, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 6.4e-05, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_CURRENT_UTC_TIME: {TYPE: str, VALUE: '2014-07-01 17:59:34.419000', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_EXECUTABLE: {TYPE: str, VALUE: 'c:/users/ooi/desktop/er60.lnk', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_FS_ROOT: {TYPE: float, VALUE: 'D:/', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_NEXT_SCHEDULED_INTERVAL: {TYPE: str, VALUE: None, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_HOST: {TYPE: str, VALUE: '157.237.15.100', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_PID: {TYPE: int, VALUE: 1864, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILENAME: {TYPE: float, VALUE: 'OOI_BT-D20140619-T150820.raw', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILESIZE: {TYPE: int, VALUE: 52428800, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_FILE_PATH: {TYPE: str, VALUE: 'D:\\data\\Bench_Test', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_FILE_PREFIX: {TYPE: str, VALUE: 'OOI_BT', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_MAX_FILE_SIZE: {TYPE: int, VALUE: 52428800, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SAMPLE_RANGE: {TYPE: float, VALUE:  80.0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SAVE_BOTTOM: {TYPE: bool, VALUE: True, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SAVE_INDEX: {TYPE: bool, VALUE: True, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SAVE_RAW: {TYPE: bool, VALUE: True, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SCHEDULED_INTERVAL_REMAINING: {TYPE: int, VALUE: 0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_GPTS_ENABLED: {TYPE: bool, VALUE: False, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SCHEDULE_FILENAME: {TYPE: str, VALUE: 'bench_test.yaml', REQUIRED: True},
+
+    }
+
+    def assert_particle_sample(self, data_particle, verify_values=False):
         '''
-        Verify a particle is a know particle to this driver and verify the particle is
-        correct
-        @param data_particle: Data particle of unkown type produced by the driver
+        Verify sample particle
+        @param data_particle:  ZPLSCStatusParticle status particle
+        @param verify_values:  bool, should we verify parameter values
         '''
-        if (isinstance(data_particle, RawDataParticle)):
-            self.assert_particle_raw(data_particle)
-        else:
-            log.error("Unknown Particle Detected: %s" % data_particle)
-            self.assertFalse(True)
+        self.assert_data_particle_keys(ZPLSCStatusParticleKey, self._sample_parameters)
+        self.assert_data_particle_header(data_particle, DataParticleType.ZPLSC_STATUS, require_instrument_timestamp=False)
+        self.assert_data_particle_parameters(data_particle, self._sample_parameters, verify_values)
+
+
+    # def assertSampleDataParticle(self, data_particle):
+    #     '''
+    #     Verify a particle is a know particle to this driver and verify the particle is
+    #     correct
+    #     @param data_particle: Data particle of unkown type produced by the driver
+    #     '''
+    #     if (isinstance(data_particle, RawDataParticle)):
+    #         self.assert_particle_raw(data_particle)
+    #     else:
+    #         log.error("Unknown Particle Detected: %s" % data_particle)
+    #         self.assertFalse(True)
 
 
 ###############################################################################
@@ -126,6 +284,7 @@ class DriverTestMixinSub(DriverTestMixin):
 ###############################################################################
 @attr('UNIT', group='mi')
 class DriverUnitTest(InstrumentDriverUnitTestCase, DriverTestMixinSub):
+
     def setUp(self):
         InstrumentDriverUnitTestCase.setUp(self)
 
@@ -140,10 +299,19 @@ class DriverUnitTest(InstrumentDriverUnitTestCase, DriverTestMixinSub):
         self.assert_enum_has_no_duplicates(ProtocolEvent())
         self.assert_enum_has_no_duplicates(Parameter())
         self.assert_enum_has_no_duplicates(Command())
+        self.assert_enum_has_no_duplicates(ZPLSCStatusParticleKey())
 
         # Test capabilites for duplicates, them verify that capabilities is a subset of proto events
         self.assert_enum_has_no_duplicates(Capability())
         self.assert_enum_complete(Capability(), ProtocolEvent())
+
+
+    def test_driver_schema(self):
+        """
+        get the driver schema and verify it is configured properly
+        """
+        driver = self.InstrumentDriver(self._got_data_event_callback)
+        self.assert_driver_schema(driver, self._driver_parameters, self._driver_capabilities)
 
 
     def test_chunker(self):
@@ -151,7 +319,10 @@ class DriverUnitTest(InstrumentDriverUnitTestCase, DriverTestMixinSub):
         Test the chunker and verify the particles created.
         """
         chunker = StringChunker(Protocol.sieve_function)
-
+        self.assert_chunker_sample(chunker, self.VALID_STATUS_01)
+        self.assert_chunker_sample_with_noise(chunker, self.VALID_STATUS_01)
+        self.assert_chunker_fragmented_sample(chunker, self.VALID_STATUS_01)
+        self.assert_chunker_combined_sample(chunker, self.VALID_STATUS_01)
 
     def test_got_data(self):
         """
@@ -161,6 +332,10 @@ class DriverUnitTest(InstrumentDriverUnitTestCase, DriverTestMixinSub):
         driver = InstrumentDriver(self._got_data_event_callback)
         self.assert_initialize_driver(driver)
 
+        self.assert_raw_particle_published(driver, True)
+
+        # Start validating data particles
+        self.assert_particle_published(driver, self.VALID_STATUS_01, self.assert_particle_sample, True)
 
     def test_protocol_filter_capabilities(self):
         """
@@ -179,6 +354,24 @@ class DriverUnitTest(InstrumentDriverUnitTestCase, DriverTestMixinSub):
         # Verify "BOGUS_CAPABILITY was filtered out
         self.assertEquals(sorted(driver_capabilities),
                           sorted(protocol._filter_capabilities(test_capabilities)))
+
+    def test_capabilities_1(self):
+        """
+        Verify the FSM reports capabilities as expected.  All states defined in this dict must
+        also be defined in the protocol FSM.
+        """
+        capabilities = {
+            ProtocolState.COMMAND: ['DRIVER_EVENT_START_AUTOSAMPLE',
+                                    'DRIVER_EVENT_GET',
+                                    'DRIVER_EVENT_SET',
+                                    'DRIVER_EVENT_START_DIRECT'],
+            ProtocolState.AUTOSAMPLE: ['DRIVER_EVENT_STOP_AUTOSAMPLE'],
+            ProtocolState.DIRECT_ACCESS: ['DRIVER_EVENT_STOP_DIRECT',
+                                          'EXECUTE_DIRECT'],
+            ProtocolState.UNKNOWN: ['DRIVER_EVENT_DISCOVER'],
+        }
+        driver = self.InstrumentDriver(self._got_data_event_callback)
+        self.assert_capabilities(driver, capabilities)
 
 
 ###############################################################################
