@@ -51,6 +51,17 @@ from mi.core.instrument.chunker import StringChunker
 DEFAULT_HOST = "https://128.193.64.201"
 DEFAULT_YAML_FILE = "driver_configuration.yaml"
 
+common_matches = {
+    'float': r'-?\d*\.?\d+',
+    'int': r'-?\d+',
+    'str': r'\w+',
+    'fn': r'\S+',
+    'rest': r'.*\r\n',
+    'tod': r'\d{8}T\d{6}',
+    'data': r'[^\*]+',
+    'crc': r'[0-9a-fA-F]{4}'
+}
+
 DEFAULT_CONFIG = {
             'file_prefix':    "DEFAULT",
             'file_path':      "DEFAULT",  #relative to filesystem_root/data
@@ -157,7 +168,7 @@ SAVE_BOTTOM = "save_bottom"
 SAVE_RAW = "save_raw"
 SCHEDULE = "schedule"
 SCHEDULE_FILENAME = "schedule_filename"
-SCHEDULED_INTERVAL_REMAINING = "scheduled_interval_remaining"
+SCHEDULED_INTERVALS_REMAINING = "scheduled_intervals_remaining"
 START_AT = "start_at"
 STOP_REPEATING_AT = "stop_repeating_at"
 TYPE = "type"
@@ -187,8 +198,6 @@ class ProtocolState(BaseEnum):
     COMMAND = DriverProtocolState.COMMAND
     AUTOSAMPLE = DriverProtocolState.AUTOSAMPLE
     DIRECT_ACCESS = DriverProtocolState.DIRECT_ACCESS
-    TEST = DriverProtocolState.TEST
-    CALIBRATE = DriverProtocolState.CALIBRATE
 
 class ProtocolEvent(BaseEnum):
     """
@@ -204,7 +213,6 @@ class ProtocolEvent(BaseEnum):
     START_AUTOSAMPLE = DriverEvent.START_AUTOSAMPLE
     STOP_AUTOSAMPLE = DriverEvent.STOP_AUTOSAMPLE
     EXECUTE_DIRECT = DriverEvent.EXECUTE_DIRECT
-    CLOCK_SYNC = DriverEvent.CLOCK_SYNC
     ACQUIRE_STATUS = DriverEvent.ACQUIRE_STATUS
 
 class Capability(BaseEnum):
@@ -302,7 +310,7 @@ class ZPLSCStatusParticleKey(BaseEnum):
     ZPLSC_SAVE_BOTTOM = "zplcs_save_bottom"                                 # Save bottom file
     ZPLSC_SAVE_INDEX = "zplcs_save_index"                                   # Save index file
     ZPLSC_SAVE_RAW = "zplcs_save_raw"                                       # Save raw file
-    ZPLSC_SCHEDULED_INTERVAL_REMAINING = "zplcs_scheduled_interval_remaining" # Number of intervals remaining in running schedule
+    ZPLSC_SCHEDULED_INTERVALS_REMAINING = "zplcs_scheduled_intervals_remaining" # Number of intervals remaining in running schedule
     ZPLSC_GPTS_ENABLED = "zplcs_gpts_enabled"                               # GPTs enabled
     ZPLSC_SCHEDULE_FILENAME = "zplcs_schedule_filename"                     # Filename for .yaml schedule file
 
@@ -360,10 +368,83 @@ class ZPLSCStatusParticle(DataParticle):
         Regular expression to match a sample pattern
         @return: regex string
         """
-        pattern = r'#? *' # patter may or may not start with a '
-        pattern += r'([0-9A-F]{6})' # temperature
-        pattern += NEWLINE
+        # pattern = r"""
+        #     (?x)
+        #     (?P<connected>                 \{\'connected \' %(rest)s)
+        #     (?P<er60_channels_38k>         \'er60_channels\':\s\{\'GPT  38 kHz      %(rest)s    %(rest)s   %(rest)s    %(rest)s      %(rest)s )
+        #     (?P<er60_channels_120k>        \s+                   \'GPT 120 kHz      %(rest)s    %(rest)s   %(rest)s    %(rest)s      %(rest)s )
+        #     (?P<er60_channels_200k>        \s+                   \'GPT 200 kHz      %(rest)s    %(rest)s   %(rest)s    %(rest)s      %(rest)s )
+        #     (?P<current_running_interval>  \'er60_status\':\s\{\'current_running_interval  %(rest)s)
+        #     (?P<current_utc_time>           current_utc_time          %(rest)s)
+        #     (?P<executable>                 executable                %(rest)s)
+        #     (?P<fs_root>                    fs_root                   %(rest)s)
+        #     (?P<host>                       host                      %(rest)s)
+        #     (?P<next_scheduled_interval>    next_scheduled_interval   %(rest)s)
+        #     (?P<port>                       port                      %(rest)s)
+        #     (?P<raw_output>                 raw_output                %(rest)s  %(rest)s   %(rest)s    %(rest)s  %(rest)s  %(rest)s  %(rest)s  %(rest)s   %(rest)s )
+        #     (?P<scheduled_intervals_remaining>   scheduled_intervals_remaining  %(rest)s)
+        #     (?P<gpts_enabled>                    gpts_enabled                   %(rest)s)
+        #     (?P<schedule>                    schedule                   %(rest)s)
+        #     (?P<schedule_filename>           schedule_filename          %(rest)s)
+        #    """ % common_matches
+
+        # pattern = r"""
+        #    (?x)
+        #    \{\'connected\'\:.*$
+        #    \s+\'er60_channels.*$
+        #    [.*$]{34}
+        #    \s+\'schedule_filename.*?yaml\'\}
+        #   """ % common_matches
+
+
+        pattern = r"""
+            (?x)
+            \{\'connected\'\:.*$
+            \s+\'er60_channels.*$
+            \s+\'mode.*$
+            \s+\'power.*$
+            \s+\'pulse_length.*$
+            \s+\'sample_interval.*$
+            \s+\'GPT\s120\skHz.*$
+            \s+\'mode.*$
+            \s+\'power.*$
+            \s+\'pulse_length.*$
+            \s+\'sample_interval.*$
+            \s+\'GPT\s200\skHz.*$
+            \s+\'mode.*$
+            \s+\'power.*$
+            \s+\'pulse_length.*$
+            \s+\'sample_interval.*$
+            \s+\'er60_status.*$
+            \s+\'current_utc_time.*$
+            \s+\'executable.*$
+            \s+\'fs_root.*$
+            \s+\'host.*$
+            \s+\'next_scheduled_interval.*$
+            \s+\'pid.*$
+            \s+\'port.*$
+            \s+\'raw_output.*$
+            \s+\'current_raw_filesize.*$
+            \s+\'file_path.*$
+            \s+\'file_prefix.*$
+            \s+\'max_file_size.*$
+            \s+\'sample_range.*$
+            \s+\'save_bottom.*$
+            \s+\'save_index.*$
+            \s+\'save_raw.*$
+            \s+\'scheduled_intervals_remaining.*$
+            \s+\'gpts_enabled.*$
+            \s+\'schedule.*$
+            \s+\'schedule_filename.*?yaml\'\}
+            """ % common_matches
+
+        # pattern = r"""
+        #     ({connected':.*?.yaml.*?)
+        # """ % common_matches
+
         return pattern
+
+
 
     @staticmethod
     def regex_compiled():
@@ -371,106 +452,65 @@ class ZPLSCStatusParticle(DataParticle):
         get the compiled regex pattern
         @return: compiled re
         """
-        return re.compile(ZPLSCStatusParticle.regex())
+        return re.compile(ZPLSCStatusParticle.regex(), re.MULTILINE)
+        #return re.compile(ZPLSCStatusParticle.regex(), re.DOTALL)
 
     def _build_parsed_values(self):
         """
         Parse ZPLSC Status response and return the ZPLSC Status particles
         @throws SampleException If there is a problem with sample
 
-        example of ZPLSC Status:
-        {
-        "schedule_filename": "qct_configuration_example_1.yaml",
-        "schedule": {
-            "max_file_size": 52428800,
-            "intervals": [
-                {
-                    "max_range": 220,
-                    "start_at": "00:00",
-                    "name": "constant_active",
-                    "interval": 1000,
-                    "frequency": {
-                        "38000": {
-                            "bandwidth": 2425.15,
-                            "pulse_length": 1024,
-                            "mode": "active",
-                            "power": 500,
-                            "sample_interval": 256
-                        },
-                        "120000": {
-                            "bandwidth": 8709.93,
-                            "pulse_length": 256,
-                            "mode": "active",
-                            "power": 100,
-                            "sample_interval": 64
-                        },
-                        "200000": {
-                            "bandwidth": 10635,
-                            "pulse_length": 256,
-                            "mode": "active",
-                            "power": 120,
-                            "sample_interval": 64
-                        }
-                    },
-                    "duration": "00:01:30",
-                    "stop_repeating_at": "23:55",
-                    "type": "constant"
-                }
-            ],
-            "file_path": "QCT_1",
-            "file_prefix": "OOI"
-        },
-        "er60_channels": {
-            "GPT 200 kHz 00907207b7b1 6-2 OOI38|200": {
-                "pulse_length": 0.000256,
-                "frequency": 200000,
-                "sample_interval": 0.000064,
-                "power": 25,
-                "mode": "passive"
-            },
-            "GPT 120 kHz 00907207b7dc 1-1 ES120-7CD": {
-                "pulse_length": 0.000256,
-                "frequency": 120000,
-                "sample_interval": 0.000064,
-                "power": 25,
-                "mode": "passive"
-            },
-            "GPT  38 kHz 00907207b7b1 6-1 OOI.38|200": {
-                "pulse_length": 0.001024,
-                "frequency": 38000,
-                "sample_interval": 0.000256,
-                "power": 100,
-                "mode": "passive"
-            }
-        },
-        "gpts_enabled": false,
-        "er60_status": {
-            "executable": "c:/users/ooi/desktop/er60.lnk",
-            "current_utc_time": "2014-05-28 21:31:44.929000",
-            "current_running_interval": null,
-            "pid": 3560,
-            "host": "157.237.15.100",
-            "scheduled_intervals_remaining": 96,
-            "next_scheduled_interval": "2014-05-28 00:00:00.000000",
-            "raw_output": {
-                "max_file_size": 52428800,
-                "sample_range": 30,
-                "file_prefix": "OOI",
-                "save_raw": true,
-                "current_raw_filesize": null,
-                "save_index": true,
-                "save_bottom": true,
-                "current_raw_filename": "OOI-D20140527-T110604.raw",
-                "file_path": "D:\\data\\QCT_3"
-            },
-            "fs_root": "D:/",
-            "port": 52890
-        },
-        "connected": true
-        }
+        {'connected': True,
+         'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000,
+                                                                       'mode': 'active',
+                                                                       'power': 100.0,
+                                                                       'pulse_length': 0.000256,
+                                                                       'sample_interval': 6.4e-05},
+                           'GPT 120 kHz 00907207b7dc 1-1 ES120-7CD': {'frequency': 120000,
+                                                                      'mode': 'active',
+                                                                      'power': 100.0,
+                                                                      'pulse_length': 6.4e-05,
+                                                                      'sample_interval': 1.6e-05},
+                           'GPT 200 kHz 00907207b7b1 6-2 OOI38|200': {'frequency': 200000,
+                                                                      'mode': 'active',
+                                                                      'power': 120.0,
+                                                                      'pulse_length': 6.4e-05,
+                                                                      'sample_interval': 1.6e-05}},
+         'er60_status': {'current_running_interval': None,
+                         'current_utc_time': '2014-07-09 01:23:39.691000',
+                         'executable': 'c:/users/ooi/desktop/er60.lnk',
+                         'fs_root': 'D:/',
+                         'host': '157.237.15.100',
+                         'next_scheduled_interval': None,
+                         'pid': 1864,
+                         'port': 56635,
+                         'raw_output': {'current_raw_filename': 'OOI-D20140707-T214500.raw',
+                                        'current_raw_filesize': None,
+                                        'file_path': 'D:\\data\\QCT_1',
+                                        'file_prefix': 'OOI',
+                                        'max_file_size': 52428800,
+                                        'sample_range': 220.0,
+                                        'save_bottom': True,
+                                        'save_index': True,
+                                        'save_raw': True},
+                         'scheduled_intervals_remaining': 0},
+         'gpts_enabled': False,
+         'schedule': {},
+         'schedule_filename': 'qct_configuration_example_1.yaml'}
         """
         try:
-            config = json.loads(self.raw_data)
+            log.debug("status raw_data = %s", self.raw_data)
+            #config = json.loads(self.raw_data)
+            #log.debug("config status = %s", config)
+
+            match = ZPLSCStatusParticle.regex_compiled().match(self.raw_data)
+
+            if not match:
+                raise SampleException("No regex match of ZPLSC status data: [%s]" %
+                                  self.raw_data)
+
+            config = yaml.load(self.raw_data)
+
             if not isinstance(config, dict):
                 raise SampleException("ZPLSC status data is not a dictionary" % self.raw_data)
 
@@ -497,14 +537,23 @@ class ZPLSCStatusParticle(DataParticle):
             current_utc_time = er60_status[CURRENT_UTC_TIME]
             executable = er60_status[EXECUTABLE]
             fs_root = er60_status[FS_ROOT]
-            next_scheduled_interval = er60_status[NEXT_SCHEDULED_INTERVAL]
+
+            if er60_status[NEXT_SCHEDULED_INTERVAL] == None:
+                next_scheduled_interval = 'None'
+            else:
+                next_scheduled_interval = er60_status[NEXT_SCHEDULED_INTERVAL]
+
             host = er60_status[HOST]
             pid = er60_status[PID]
-            #port = er60_status[PORT]
+            port = er60_status[PORT]
 
             raw_output = config[ER60_STATUS][RAW_OUTPUT]
+
             current_raw_filename = raw_output[CURRENT_RAW_FILENAME]
-            current_raw_filesize = raw_output[CURRENT_RAW_FILESIZE]
+            if raw_output[CURRENT_RAW_FILESIZE] == None:
+                current_raw_filesize = 0
+            else:
+                current_raw_filesize = raw_output[CURRENT_RAW_FILESIZE]
             file_path = raw_output[FILE_PATH]
             file_prefix = raw_output[FILE_PREFIX]
             max_file_size = raw_output[MAX_FILE_SIZE]
@@ -512,8 +561,9 @@ class ZPLSCStatusParticle(DataParticle):
             save_bottom = raw_output[SAVE_BOTTOM]
             save_index = raw_output[SAVE_INDEX]
             save_raw = raw_output[SAVE_RAW]
-            scheduled_interval_remaining = er60_status[SCHEDULED_INTERVAL_REMAINING]
+            scheduled_intervals_remaining = er60_status[SCHEDULED_INTERVALS_REMAINING]
             gpts_enabled = config[GPTS_ENABLED]
+            schedule = config[SCHEDULE]
             schedule_filename = config[SCHEDULE_FILENAME]
 
             # intervals = []
@@ -532,7 +582,9 @@ class ZPLSCStatusParticle(DataParticle):
              raise SampleException("ValueError while converting ZPLSC Status: [%s]" %
                                   self.raw_data)
 
-        result = [{DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_MODE,
+        result = [{DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CONNECTED,
+                   DataParticleKey.VALUE: connected},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_MODE,
                    DataParticleKey.VALUE: active_200k_mode},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_POWER,
                    DataParticleKey.VALUE: active_200k_power},
@@ -548,8 +600,10 @@ class ZPLSCStatusParticle(DataParticle):
                     DataParticleKey.VALUE: active_120k_pulse_length},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_SAMPLE_INTERVAL,
                    DataParticleKey.VALUE: active_120k_sample_interval},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_MODE,
+                   DataParticleKey.VALUE: active_38k_mode},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_POWER,
-                   DataParticleKey.VALUE: active_120k_power},
+                   DataParticleKey.VALUE: active_38k_power},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_PULSE_LENGTH,
                     DataParticleKey.VALUE: active_38k_pulse_length},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_SAMPLE_INTERVAL,
@@ -557,41 +611,42 @@ class ZPLSCStatusParticle(DataParticle):
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CURRENT_UTC_TIME,
                    DataParticleKey.VALUE: current_utc_time},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_EXECUTABLE,
-                   DataParticleKey.VALUE: executable},
+                    DataParticleKey.VALUE: executable},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_FS_ROOT,
-                   DataParticleKey.VALUE: fs_root},
+                    DataParticleKey.VALUE: fs_root},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_NEXT_SCHEDULED_INTERVAL,
-                   DataParticleKey.VALUE: next_scheduled_interval},
+                    DataParticleKey.VALUE: next_scheduled_interval},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_HOST,
-                   DataParticleKey.VALUE: host},
+                    DataParticleKey.VALUE: host},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_PID,
-                   DataParticleKey.VALUE: pid},
-                  #{DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_PORT,
-                  #DataParticleKey.VALUE: port},
+                    DataParticleKey.VALUE: pid},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_PORT,
+                    DataParticleKey.VALUE: port},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILENAME,
-                   DataParticleKey.VALUE: current_raw_filename},
+                    DataParticleKey.VALUE: current_raw_filename},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILESIZE,
-                   DataParticleKey.VALUE: current_raw_filesize},
+                    DataParticleKey.VALUE: current_raw_filesize},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_FILE_PATH,
-                   DataParticleKey.VALUE: file_path},
+                    DataParticleKey.VALUE: file_path},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_FILE_PREFIX,
-                   DataParticleKey.VALUE: file_prefix},
+                    DataParticleKey.VALUE: file_prefix},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_MAX_FILE_SIZE,
-                   DataParticleKey.VALUE: max_file_size},
+                    DataParticleKey.VALUE: max_file_size},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAMPLE_RANGE,
-                   DataParticleKey.VALUE: sample_range},
+                    DataParticleKey.VALUE: sample_range},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAVE_BOTTOM,
-                   DataParticleKey.VALUE: save_bottom},
+                    DataParticleKey.VALUE: save_bottom},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAVE_INDEX,
-                   DataParticleKey.VALUE: save_index},
+                    DataParticleKey.VALUE: save_index},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SAVE_RAW,
                    DataParticleKey.VALUE: save_raw},
-                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SCHEDULED_INTERVAL_REMAINING,
-                   DataParticleKey.VALUE: scheduled_interval_remaining},
+                  {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SCHEDULED_INTERVALS_REMAINING,
+                    DataParticleKey.VALUE: scheduled_intervals_remaining},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_GPTS_ENABLED,
-                   DataParticleKey.VALUE: gpts_enabled},
+                    DataParticleKey.VALUE: gpts_enabled},
                   {DataParticleKey.VALUE_ID: ZPLSCStatusParticleKey.ZPLSC_SCHEDULE_FILENAME,
-                   DataParticleKey.VALUE: schedule_filename}]
+                    DataParticleKey.VALUE: schedule_filename}]
+        print "build_parsed_value result = %s", result
 
         return result
 
@@ -655,7 +710,6 @@ class Protocol(CommandResponseInstrumentProtocol):
         self._protocol_fsm.add_handler(ProtocolState.UNKNOWN, ProtocolEvent.ENTER, self._handler_unknown_enter)
         self._protocol_fsm.add_handler(ProtocolState.UNKNOWN, ProtocolEvent.EXIT, self._handler_unknown_exit)
         self._protocol_fsm.add_handler(ProtocolState.UNKNOWN, ProtocolEvent.DISCOVER, self._handler_discover)
-        self._protocol_fsm.add_handler(ProtocolState.UNKNOWN, ProtocolEvent.START_DIRECT, self._handler_command_start_direct)
 
         self._protocol_fsm.add_handler(ProtocolState.COMMAND, ProtocolEvent.ENTER, self._handler_command_enter)
         self._protocol_fsm.add_handler(ProtocolState.COMMAND, ProtocolEvent.EXIT, self._handler_command_exit)
@@ -666,7 +720,6 @@ class Protocol(CommandResponseInstrumentProtocol):
         self._protocol_fsm.add_handler(ProtocolState.COMMAND, ProtocolEvent.SET, self._handler_command_set)
 
         self._protocol_fsm.add_handler(ProtocolState.AUTOSAMPLE, ProtocolEvent.STOP_AUTOSAMPLE, self._handler_autosample_stop)
-        self._protocol_fsm.add_handler(ProtocolState.AUTOSAMPLE, ProtocolEvent.DISCOVER, self._handler_discover)
 
         self._protocol_fsm.add_handler(ProtocolState.DIRECT_ACCESS, ProtocolEvent.ENTER, self._handler_direct_access_enter)
         self._protocol_fsm.add_handler(ProtocolState.DIRECT_ACCESS, ProtocolEvent.EXIT, self._handler_direct_access_exit)
@@ -717,13 +770,16 @@ class Protocol(CommandResponseInstrumentProtocol):
         matchers = []
         return_list = []
 
+        log.debug("sieve_function enters...")
         matchers.append(ZPLSCStatusParticle.regex_compiled())
 
         for matcher in matchers:
             log.debug('matcher: %r raw_data: %r', matcher.pattern, raw_data)
             for match in matcher.finditer(raw_data):
+                log.debug("match in matcher...")
                 return_list.append((match.start(), match.end()))
 
+        log.debug("return_list : %s", return_list)
         return return_list
 
     def _build_param_dict(self):
@@ -1378,8 +1434,6 @@ class Protocol(CommandResponseInstrumentProtocol):
         Discover current state
         @retval (next_state, result)
         """
-        next_state = None
-        next_agent_state = None
 
         next_state = ProtocolState.COMMAND
         next_agent_state = ResourceAgentState.IDLE
