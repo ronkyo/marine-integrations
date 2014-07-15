@@ -148,43 +148,81 @@ class DriverTestMixinSub(DriverTestMixin):
     STATES = ParameterTestConfigKey.STATES
 
     INVALID_STATUS = "This is an invalid status; it had better cause an exception."
-    VALID_STATUS_01 = "{'connected': True, \
-                   'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000, \
-                                                               'mode': 'active', \
-                                                               'power': 100.0, \
-                                                               'pulse_length': 0.000256, \
-                                                               'sample_interval': 6.4e-05}, \
-                   'GPT 120 kHz 00907207b7dc 1-1 ES120-7CD': {'frequency': 120000, \
-                                                              'mode': 'active', \
-                                                              'power': 100.0, \
-                                                              'pulse_length': 6.4e-05, \
-                                                              'sample_interval': 1.6e-05}, \
-                   'GPT 200 kHz 00907207b7b1 6-2 OOI38|200': {'frequency': 200000, \
-                                                              'mode': 'active', \
-                                                              'power': 120.0, \
-                                                              'pulse_length': 6.4e-05, \
-                                                              'sample_interval': 1.6e-05}}, \
-                  'er60_status': {'current_running_interval': None, \
-                 'current_utc_time': '2014-07-01 17:59:34.419000', \
-                 'executable': 'c:/users/ooi/desktop/er60.lnk', \
-                 'fs_root': 'D:/', \
-                 'host': '157.237.15.100', \
-                 'next_scheduled_interval': None, \
-                 'pid': 1864, \
-                 'port': 56635, \
-                 'raw_output': {'current_raw_filename': 'OOI_BT-D20140619-T150820.raw', \
-                                'current_raw_filesize': None, \
-                                'file_path': 'D:\\data\\Bench_Test', \
-                                'file_prefix': 'OOI_BT', \
-                                'max_file_size': 52428800, \
-                                'sample_range': 80.0, \
-                                'save_bottom': True, \
-                                'save_index': True, \
-                                'save_raw': True}, \
-                 'scheduled_intervals_remaining': 0}, \
-                 'gpts_enabled': False, \
-                 'schedule': {}, \
-                 'schedule_filename': 'bench_test.yaml'}" + NEWLINE
+    # VALID_STATUS_01 = "{'connected': True, \
+    #                'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000, \
+    #                                                            'mode': 'active', \
+    #                                                            'power': 100.0, \
+    #                                                            'pulse_length': 0.000256, \
+    #                                                            'sample_interval': 6.4e-05}, \
+    #                'GPT 120 kHz 00907207b7dc 1-1 ES120-7CD': {'frequency': 120000, \
+    #                                                           'mode': 'active', \
+    #                                                           'power': 100.0, \
+    #                                                           'pulse_length': 6.4e-05, \
+    #                                                           'sample_interval': 1.6e-05}, \
+    #                'GPT 200 kHz 00907207b7b1 6-2 OOI38|200': {'frequency': 200000, \
+    #                                                           'mode': 'active', \
+    #                                                           'power': 120.0, \
+    #                                                           'pulse_length': 6.4e-05, \
+    #                                                           'sample_interval': 1.6e-05}}, \
+    #               'er60_status': {'current_running_interval': None, \
+    #              'current_utc_time': '2014-07-01 17:59:34.419000', \
+    #              'executable': 'c:/users/ooi/desktop/er60.lnk', \
+    #              'fs_root': 'D:/', \
+    #              'host': '157.237.15.100', \
+    #              'next_scheduled_interval': None, \
+    #              'pid': 1864, \
+    #              'port': 56635, \
+    #              'raw_output': {'current_raw_filename': 'OOI_BT-D20140619-T150820.raw', \
+    #                             'current_raw_filesize': None, \
+    #                             'file_path': 'D:\\data\\Bench_Test', \
+    #                             'file_prefix': 'OOI_BT', \
+    #                             'max_file_size': 52428800, \
+    #                             'sample_range': 80.0, \
+    #                             'save_bottom': True, \
+    #                             'save_index': True, \
+    #                             'save_raw': True}, \
+    #              'scheduled_intervals_remaining': 0}, \
+    #              'gpts_enabled': False, \
+    #              'schedule': {}, \
+    #              'schedule_filename': 'bench_test.yaml'}" + NEWLINE
+
+    VALID_STATUS_01 = "{'connected': True," + NEWLINE + \
+"         'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000," + NEWLINE + \
+"                                                                      'mode': 'active'," + NEWLINE + \
+"                                                                       'power': 100.0,"  + NEWLINE + \
+"                                                                       'pulse_length': 0.000256," + NEWLINE + \
+"                                                                       'sample_interval': 6.4e-05}," + NEWLINE + \
+"                           'GPT 120 kHz 00907207b7dc 1-1 ES120-7CD': {'frequency': 120000," + NEWLINE + \
+"                                                                      'mode': 'active'," + NEWLINE + \
+"                                                                      'power': 100.0," + NEWLINE + \
+"                                                                      'pulse_length': 6.4e-05," + NEWLINE +  \
+"                                                                      'sample_interval': 1.6e-05}," + NEWLINE + \
+"                           'GPT 200 kHz 00907207b7b1 6-2 OOI38|200': {'frequency': 200000," + NEWLINE + \
+"                                                                      'mode': 'active'," + NEWLINE + \
+"                                                                     'power': 120.0," + NEWLINE + \
+"                                                                      'pulse_length': 6.4e-05," + NEWLINE + \
+"                                                                      'sample_interval': 1.6e-05}}," + NEWLINE + \
+"         'er60_status': {'current_running_interval': None," + NEWLINE + \
+"                         'current_utc_time': '2014-07-09 01:23:39.691000'," + NEWLINE + \
+"                         'executable': 'c:/users/ooi/desktop/er60.lnk'," + NEWLINE + \
+"                         'fs_root': 'D:/'," + NEWLINE + \
+"                         'host': '157.237.15.100'," + NEWLINE + \
+"                         'next_scheduled_interval': None," + NEWLINE + \
+"                         'pid': 1864," + NEWLINE + \
+"                         'port': 56635," + NEWLINE + \
+"                         'raw_output': {'current_raw_filename': 'OOI-D20140707-T214500.raw'," + NEWLINE + \
+"                                        'current_raw_filesize': 0," + NEWLINE + \
+"                                       'file_path': 'D:\\data\\QCT_1'," + NEWLINE + \
+"                                        'file_prefix': 'OOI'," + NEWLINE + \
+"                                        'max_file_size': 52428800," + NEWLINE + \
+"                                        'sample_range': 220.0," + NEWLINE +  \
+"                                        'save_bottom': True," + NEWLINE + \
+"                                        'save_index': True," + NEWLINE + \
+"                                        'save_raw': True}," + NEWLINE + \
+"                         'scheduled_intervals_remaining': 0}," + NEWLINE + \
+"         'gpts_enabled': False," + NEWLINE + \
+"         'schedule': {}," + NEWLINE + \
+"         'schedule_filename': 'qct_configuration_example_1.yaml'}"
 
     _driver_capabilities = {
         # capabilities defined in the IOS
@@ -212,36 +250,38 @@ class DriverTestMixinSub(DriverTestMixin):
 
 
     _sample_parameters = {
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_MODE: {TYPE: str, VALUE: 'active', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_CONNECTED: {TYPE: bool, VALUE: True, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_MODE: {TYPE: unicode, VALUE: 'active', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_POWER: {TYPE: float, VALUE: 100.0, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_PULSE_LENGTH: {TYPE: float, VALUE: 0.090, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_PULSE_LENGTH: {TYPE: float, VALUE: 6.4e-05, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 1.6e-05, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_MODE: {TYPE: str, VALUE: 'active', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_MODE: {TYPE: unicode, VALUE: 'active', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_POWER: {TYPE: float, VALUE: 120.0, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_PULSE_LENGTH: {TYPE: float, VALUE: 0.090, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 0.090, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_MODE: {TYPE: str, VALUE: 'active', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_PULSE_LENGTH: {TYPE: float, VALUE: 6.4e-05, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 1.6e-05, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_MODE: {TYPE: unicode, VALUE: 'active', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_POWER: {TYPE: float, VALUE: 100.0, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_PULSE_LENGTH: {TYPE: float, VALUE: 0.000256, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 6.4e-05, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_CURRENT_UTC_TIME: {TYPE: str, VALUE: '2014-07-01 17:59:34.419000', REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_EXECUTABLE: {TYPE: str, VALUE: 'c:/users/ooi/desktop/er60.lnk', REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_FS_ROOT: {TYPE: float, VALUE: 'D:/', REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_NEXT_SCHEDULED_INTERVAL: {TYPE: str, VALUE: None, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_HOST: {TYPE: str, VALUE: '157.237.15.100', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_CURRENT_UTC_TIME: {TYPE: unicode, VALUE: '2014-07-09 01:23:39.691000', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_EXECUTABLE: {TYPE: unicode, VALUE: 'c:/users/ooi/desktop/er60.lnk', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_FS_ROOT: {TYPE: unicode, VALUE: 'D:/', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_NEXT_SCHEDULED_INTERVAL: {TYPE: unicode, VALUE: 'None', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_HOST: {TYPE: unicode, VALUE: '157.237.15.100', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_PID: {TYPE: int, VALUE: 1864, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILENAME: {TYPE: float, VALUE: 'OOI_BT-D20140619-T150820.raw', REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILESIZE: {TYPE: int, VALUE: 52428800, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_FILE_PATH: {TYPE: str, VALUE: 'D:\\data\\Bench_Test', REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_FILE_PREFIX: {TYPE: str, VALUE: 'OOI_BT', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_PORT: {TYPE: int, VALUE: 56635, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILENAME: {TYPE: unicode, VALUE: 'OOI-D20140707-T214500.raw', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILESIZE: {TYPE: int, VALUE: 0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_FILE_PATH: {TYPE: unicode, VALUE: 'D:\\data\\QCT_1', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_FILE_PREFIX: {TYPE: unicode, VALUE: 'OOI', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_MAX_FILE_SIZE: {TYPE: int, VALUE: 52428800, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_SAMPLE_RANGE: {TYPE: float, VALUE:  80.0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SAMPLE_RANGE: {TYPE: float, VALUE:  220.0, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_SAVE_BOTTOM: {TYPE: bool, VALUE: True, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_SAVE_INDEX: {TYPE: bool, VALUE: True, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_SAVE_RAW: {TYPE: bool, VALUE: True, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_SCHEDULED_INTERVAL_REMAINING: {TYPE: int, VALUE: 0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SCHEDULED_INTERVALS_REMAINING: {TYPE: int, VALUE: 0, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_GPTS_ENABLED: {TYPE: bool, VALUE: False, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_SCHEDULE_FILENAME: {TYPE: str, VALUE: 'bench_test.yaml', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SCHEDULE_FILENAME: {TYPE: unicode, VALUE: 'qct_configuration_example_1.yaml', REQUIRED: True},
 
     }
 
@@ -313,6 +353,42 @@ class DriverUnitTest(InstrumentDriverUnitTestCase, DriverTestMixinSub):
         driver = self.InstrumentDriver(self._got_data_event_callback)
         self.assert_driver_schema(driver, self._driver_parameters, self._driver_capabilities)
 
+    def test_capabilities(self):
+        """
+        Verify the FSM reports capabilities as expected.  All states defined in this dict must
+        also be defined in the protocol FSM.
+        """
+        capabilities = {
+            ProtocolState.COMMAND: ['DRIVER_EVENT_START_AUTOSAMPLE',
+                                    'DRIVER_EVENT_GET',
+                                    'DRIVER_EVENT_SET',
+                                    'DRIVER_EVENT_START_DIRECT',
+                                    'DRIVER_EVENT_ACQUIRE_STATUS'],
+            ProtocolState.AUTOSAMPLE: ['DRIVER_EVENT_STOP_AUTOSAMPLE'],
+            ProtocolState.DIRECT_ACCESS: ['DRIVER_EVENT_STOP_DIRECT',
+                                          'EXECUTE_DIRECT'],
+            ProtocolState.UNKNOWN: ['DRIVER_EVENT_DISCOVER'],
+        }
+        driver = self.InstrumentDriver(self._got_data_event_callback)
+        self.assert_capabilities(driver, capabilities)
+
+    def test_protocol_filter_capabilities(self):
+        """
+        This tests driver filter_capabilities.
+        Iterate through available capabilities, and verify that they can pass successfully through the filter.
+        Test silly made up capabilities to verify they are blocked by filter.
+        """
+        mock_callback = Mock()
+        protocol = Protocol(Prompt, NEWLINE, mock_callback)
+        driver_capabilities = Capability().list()
+        test_capabilities = Capability().list()
+
+        # Add a bogus capability that will be filtered out.
+        test_capabilities.append("BOGUS_CAPABILITY")
+
+        # Verify "BOGUS_CAPABILITY was filtered out
+        self.assertEquals(sorted(driver_capabilities),
+                          sorted(protocol._filter_capabilities(test_capabilities)))
 
     def test_chunker(self):
         """
@@ -336,42 +412,6 @@ class DriverUnitTest(InstrumentDriverUnitTestCase, DriverTestMixinSub):
 
         # Start validating data particles
         self.assert_particle_published(driver, self.VALID_STATUS_01, self.assert_particle_sample, True)
-
-    def test_protocol_filter_capabilities(self):
-        """
-        This tests driver filter_capabilities.
-        Iterate through available capabilities, and verify that they can pass successfully through the filter.
-        Test silly made up capabilities to verify they are blocked by filter.
-        """
-        mock_callback = Mock()
-        protocol = Protocol(Prompt, NEWLINE, mock_callback)
-        driver_capabilities = Capability().list()
-        test_capabilities = Capability().list()
-
-        # Add a bogus capability that will be filtered out.
-        test_capabilities.append("BOGUS_CAPABILITY")
-
-        # Verify "BOGUS_CAPABILITY was filtered out
-        self.assertEquals(sorted(driver_capabilities),
-                          sorted(protocol._filter_capabilities(test_capabilities)))
-
-    def test_capabilities_1(self):
-        """
-        Verify the FSM reports capabilities as expected.  All states defined in this dict must
-        also be defined in the protocol FSM.
-        """
-        capabilities = {
-            ProtocolState.COMMAND: ['DRIVER_EVENT_START_AUTOSAMPLE',
-                                    'DRIVER_EVENT_GET',
-                                    'DRIVER_EVENT_SET',
-                                    'DRIVER_EVENT_START_DIRECT'],
-            ProtocolState.AUTOSAMPLE: ['DRIVER_EVENT_STOP_AUTOSAMPLE'],
-            ProtocolState.DIRECT_ACCESS: ['DRIVER_EVENT_STOP_DIRECT',
-                                          'EXECUTE_DIRECT'],
-            ProtocolState.UNKNOWN: ['DRIVER_EVENT_DISCOVER'],
-        }
-        driver = self.InstrumentDriver(self._got_data_event_callback)
-        self.assert_capabilities(driver, capabilities)
 
 
 ###############################################################################
