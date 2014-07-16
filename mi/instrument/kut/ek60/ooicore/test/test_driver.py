@@ -147,44 +147,66 @@ class DriverTestMixinSub(DriverTestMixin):
     DEFAULT = ParameterTestConfigKey.DEFAULT
     STATES = ParameterTestConfigKey.STATES
 
+    DEFAULT_SCHEDULE = DEFAULT_YAML = "# Default configuration file" + NEWLINE + \
+                                    "---" + NEWLINE + \
+                                    "file_prefix:    \"DEFAULT\"" + NEWLINE + \
+                                    "file_path:      \"DEFAULT\"" + NEWLINE + \
+                                    "max_file_size:   52428800" + NEWLINE + \
+                                    "intervals: " + NEWLINE + \
+                                    "    name: \"default\"" + NEWLINE + \
+                                    "    type: \"constant\"" + NEWLINE + \
+                                    "start_at:  \"00:00\"" + NEWLINE +  \
+                                    "duration:  \"00:15:00\"" + NEWLINE + \
+                                    "repeat_every:   \"01:00\"" + NEWLINE + \
+                                    "stop_repeating_at: \"23:55\"" + NEWLINE +  \
+                                    "interval:   1000" + NEWLINE + \
+                                    "max_range:  80" + NEWLINE + \
+                                    "frequency: " + NEWLINE + \
+                                    "   38000: " + NEWLINE + NEWLINE + \
+                                    "     mode:   active" + NEWLINE + \
+                                    "     power:  100 " + NEWLINE + \
+                                    "     pulse_length:   256" + NEWLINE + \
+                                    "   120000: " + NEWLINE + \
+                                    "     mode:   active " + NEWLINE + \
+                                    "     power:  100 " + NEWLINE + \
+                                    "     pulse_length:   64" + NEWLINE + \
+                                    "   200000: " + NEWLINE + \
+                                    "     mode:   active " + NEWLINE + \
+                                    "     power:  120 " + NEWLINE + \
+                                    "     pulse_length:   64"
+
+
+    TEST_SCHEDULE =  "# QCT Example 5 configuration file" + NEWLINE + \
+                     "---" + NEWLINE + \
+                     "file_prefix:    \"OOI\"" + NEWLINE + \
+                     "file_path:      \"QCT_5\"         #relative to filesystem_root/data" + NEWLINE + \
+                     "max_file_size:   52428800       #50MB in bytes:  50 * 1024 * 1024" + NEWLINE + \
+                     "" + NEWLINE + \
+                     "intervals:" + NEWLINE + \
+                     " " + NEWLINE + \
+                     "-   name: \"constant_38kHz_passive\"" + NEWLINE + \
+                     "   type: \"constant\"" + NEWLINE + \
+                     "   start_at:  \"00:00\"" + NEWLINE + \
+                     "    duration:  \"00:01:30\"" + NEWLINE + \
+                     "    repeat_every:   \"00:05\"" + NEWLINE + \
+                     "    stop_repeating_at: \"23:55\"" + NEWLINE + \
+                     "    interval:   1000" + NEWLINE + \
+                     "   max_range:  150"  + NEWLINE + \
+                     "   frequency:"  + NEWLINE + \
+                     "     38000:" + NEWLINE + \
+                     "         mode:   passive" + NEWLINE + \
+                     "         power:  100" + NEWLINE + \
+                     "         pulse_length:   1024" + NEWLINE + \
+                     "      120000:" + NEWLINE + \
+                     "         mode:   active" + NEWLINE + \
+                     "         power:  100" + NEWLINE + \
+                     "         pulse_length:   256" + NEWLINE + \
+                     "     200000:" + NEWLINE + \
+                     "         mode:   active"  + NEWLINE + \
+                     "         power:  120" + NEWLINE + \
+                     "         pulse_length:   256"
+
     INVALID_STATUS = "This is an invalid status; it had better cause an exception."
-    # VALID_STATUS_01 = "{'connected': True, \
-    #                'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000, \
-    #                                                            'mode': 'active', \
-    #                                                            'power': 100.0, \
-    #                                                            'pulse_length': 0.000256, \
-    #                                                            'sample_interval': 6.4e-05}, \
-    #                'GPT 120 kHz 00907207b7dc 1-1 ES120-7CD': {'frequency': 120000, \
-    #                                                           'mode': 'active', \
-    #                                                           'power': 100.0, \
-    #                                                           'pulse_length': 6.4e-05, \
-    #                                                           'sample_interval': 1.6e-05}, \
-    #                'GPT 200 kHz 00907207b7b1 6-2 OOI38|200': {'frequency': 200000, \
-    #                                                           'mode': 'active', \
-    #                                                           'power': 120.0, \
-    #                                                           'pulse_length': 6.4e-05, \
-    #                                                           'sample_interval': 1.6e-05}}, \
-    #               'er60_status': {'current_running_interval': None, \
-    #              'current_utc_time': '2014-07-01 17:59:34.419000', \
-    #              'executable': 'c:/users/ooi/desktop/er60.lnk', \
-    #              'fs_root': 'D:/', \
-    #              'host': '157.237.15.100', \
-    #              'next_scheduled_interval': None, \
-    #              'pid': 1864, \
-    #              'port': 56635, \
-    #              'raw_output': {'current_raw_filename': 'OOI_BT-D20140619-T150820.raw', \
-    #                             'current_raw_filesize': None, \
-    #                             'file_path': 'D:\\data\\Bench_Test', \
-    #                             'file_prefix': 'OOI_BT', \
-    #                             'max_file_size': 52428800, \
-    #                             'sample_range': 80.0, \
-    #                             'save_bottom': True, \
-    #                             'save_index': True, \
-    #                             'save_raw': True}, \
-    #              'scheduled_intervals_remaining': 0}, \
-    #              'gpts_enabled': False, \
-    #              'schedule': {}, \
-    #              'schedule_filename': 'bench_test.yaml'}" + NEWLINE
 
     VALID_STATUS_01 = "{'connected': True," + NEWLINE + \
 "         'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000," + NEWLINE + \
@@ -244,7 +266,7 @@ class DriverTestMixinSub(DriverTestMixin):
     _driver_parameters = {
         # Parameters defined in the IOS
 
-        Parameter.SCHEDULE: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: "Test", VALUE: "Test"},
+        Parameter.SCHEDULE: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: DEFAULT_SCHEDULE, VALUE: DEFAULT_SCHEDULE},
         Parameter.FTP_IP_ADDRESS: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: "128.193.64.201", VALUE: "128.193.64.201"},
     }
 
@@ -294,19 +316,6 @@ class DriverTestMixinSub(DriverTestMixin):
         self.assert_data_particle_keys(ZPLSCStatusParticleKey, self._sample_parameters)
         self.assert_data_particle_header(data_particle, DataParticleType.ZPLSC_STATUS, require_instrument_timestamp=False)
         self.assert_data_particle_parameters(data_particle, self._sample_parameters, verify_values)
-
-
-    # def assertSampleDataParticle(self, data_particle):
-    #     '''
-    #     Verify a particle is a know particle to this driver and verify the particle is
-    #     correct
-    #     @param data_particle: Data particle of unkown type produced by the driver
-    #     '''
-    #     if (isinstance(data_particle, RawDataParticle)):
-    #         self.assert_particle_raw(data_particle)
-    #     else:
-    #         log.error("Unknown Particle Detected: %s" % data_particle)
-    #         self.assertFalse(True)
 
 
 ###############################################################################
@@ -422,11 +431,99 @@ class DriverUnitTest(InstrumentDriverUnitTestCase, DriverTestMixinSub):
 #     and common for all drivers (minimum requirement for ION ingestion)      #
 ###############################################################################
 @attr('INT', group='mi')
-class DriverIntegrationTest(InstrumentDriverIntegrationTestCase):
+class DriverIntegrationTest(InstrumentDriverIntegrationTestCase, DriverTestMixinSub):
     def setUp(self):
         InstrumentDriverIntegrationTestCase.setUp(self)
 
 
+    def test_connect(self):
+        """
+        Test configuring and connecting to the device through the port
+        agent. Discover device state.
+        """
+        self.assert_initialize_driver()
+
+
+    def test_direct_access(self):
+        """
+        Verify we can enter the direct access state
+        """
+        self.assert_initialize_driver(ProtocolState.COMMAND)
+        self.assert_state_change(ProtocolState.COMMAND, 3)
+        self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.START_DIRECT)
+        self.assert_state_change(ProtocolState.DIRECT_ACCESS, 3)
+        self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.STOP_DIRECT)
+        self.assert_state_change(ProtocolState.COMMAND, 3)
+
+    def test_state_transition(self):
+        """
+        Tests to see if we can make transition to different states
+        """
+        self.assert_initialize_driver(ProtocolState.COMMAND)
+        self.assert_state_change(ProtocolState.COMMAND, 3)
+        #self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.DISCOVER)
+        #self.assert_state_change(ProtocolState.COMMAND, 3)
+
+        # Test transition to auto sample
+        self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.START_AUTOSAMPLE)
+        self.assert_state_change(ProtocolState.AUTOSAMPLE, 3)
+
+        # Test transition back to command state
+        self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.STOP_AUTOSAMPLE)
+        self.assert_state_change(ProtocolState.COMMAND, 3)
+
+        # Test transition to direct access state
+        self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.START_DIRECT)
+        self.assert_state_change(ProtocolState.DIRECT_ACCESS, 3)
+
+        # Test transition back to command state
+        self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.STOP_DIRECT)
+        self.assert_state_change(ProtocolState.COMMAND, 3)
+
+    def test_parameters(self):
+        """
+        Test driver parameters and verify their type.  Startup parameters also verify the parameter
+        value.  This test confirms that parameters are being read/converted properly and that
+        the startup has been applied.
+        """
+        self.assert_initialize_driver()
+        reply = self.driver_client.cmd_dvr('get_resource', Parameter.ALL)
+        log.debug("reply = %s", reply)
+        self.assert_driver_parameters(reply, True)
+
+        # verify we can set read/write parameters
+        self.assert_set(Parameter.FTP_IP_ADDRESS, "128.193.64.201")
+
+        # verify we can set read/write parameters
+        #self.assert_set(Parameter.SCHEDULE, DriverTestMixinSub.TEST_SCHEDULE)
+
+
+    def test_readonly_set(self):
+        # verify we cannot set read only parameters
+        self.assert_initialize_driver()
+        # self.assert_set_exception(Parameter.VERBOSE, VERBOSE_VALUE)
+        # self.assert_set_exception(Parameter.METADATA_POWERUP, METADATA_POWERUP_VALUE)
+        # self.assert_set_exception(Parameter.METADATA_RESTART, METADATA_RESTART_VALUE)
+        # self.assert_set_exception(Parameter.RES_SENSOR_POWER, RES_SENSOR_POWER_VALUE)
+        # self.assert_set_exception(Parameter.INST_AMP_POWER, INST_AMP_POWER_VALUE)
+        # self.assert_set_exception(Parameter.EH_ISOLATION_AMP_POWER, EH_ISOLATION_AMP_POWER_VALUE)
+        # self.assert_set_exception(Parameter.HYDROGEN_POWER, HYDROGEN_POWER_VALUE)
+        # self.assert_set_exception(Parameter.REFERENCE_TEMP_POWER, REFERENCE_TEMP_POWER_VALUE)
+
+
+    def test_get_params(self):
+        """
+        Test get driver parameters and verify their initial values.
+        """
+        self.assert_initialize_driver()
+        # self.assert_get(Parameter.CYCLE_TIME, CYCLE_TIME_VALUE)
+        # self.assert_get(Parameter.EH_ISOLATION_AMP_POWER, EH_ISOLATION_AMP_POWER_VALUE)
+        # self.assert_get(Parameter.HYDROGEN_POWER, HYDROGEN_POWER_VALUE)
+        # self.assert_get(Parameter.INST_AMP_POWER, INST_AMP_POWER_VALUE)
+        # self.assert_get(Parameter.METADATA_POWERUP, METADATA_POWERUP_VALUE)
+        # self.assert_get(Parameter.METADATA_RESTART, METADATA_RESTART_VALUE)
+        # self.assert_get(Parameter.REFERENCE_TEMP_POWER, REFERENCE_TEMP_POWER_VALUE)
+        # self.assert_get(Parameter.RES_SENSOR_POWER, RES_SENSOR_POWER_VALUE)
 
 ###############################################################################
 #                            QUALIFICATION TESTS                              #
