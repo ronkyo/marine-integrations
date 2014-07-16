@@ -47,6 +47,9 @@ from mi.core.instrument.data_particle import CommonDataParticleType
 from mi.core.instrument.chunker import StringChunker
 
 
+# newline.
+NEWLINE = '\r\n'
+
 # Default Instrument's IP Address
 DEFAULT_HOST = "https://128.193.64.201"
 DEFAULT_YAML_FILE = "driver_configuration.yaml"
@@ -96,39 +99,37 @@ DEFAULT_CONFIG = {
             }
         }
 
-DEFAULT_YAML = "# Default configuration file \
---- \
-file_prefix:    \"DEFAULT\" \
-file_path:      \"DEFAULT\" \
-max_file_size:   52428800 \
-intervals: \
-    name: \"default\" \
-    type: \"constant\" \
-    start_at:  \"00:00\" \
-    duration:  \"00:15:00\" \
-    repeat_every:   \"01:00\" \
-    stop_repeating_at: \"23:55\" \
-    interval:   1000 \
-    max_range:  80 \
-            frequency: \
-          38000: \
-              mode:   active \
-              power:  100 \
-              pulse_length:   256 \
-          120000: \
-              mode:   active \
-              power:  100 \
-              pulse_length:   64 \
-          200000: \
-              mode:   active \
-              power:  120 \
-              pulse_length:   64"
+DEFAULT_YAML = "# Default configuration file " + NEWLINE + \
+               "--- " + NEWLINE + \
+               "file_prefix:    \"DEFAULT\"" + NEWLINE + \
+               "file_path:      \"DEFAULT\"" + NEWLINE + \
+               "max_file_size:   52428800 " + NEWLINE + \
+               "intervals: " + NEWLINE + \
+               "name: \"default\"" + NEWLINE + \
+               "type: \"constant\"" + NEWLINE + \
+               "start_at:  \"00:00\"" + NEWLINE + \
+               "duration:  \"00:15:00\"" + NEWLINE + \
+               "repeat_every:   \"01:00\"" + NEWLINE + \
+               "stop_repeating_at: \"23:55\"" + NEWLINE + \
+               "interval:   1000" + NEWLINE + \
+               "max_range:  80 " + NEWLINE + \
+               "frequency: " + NEWLINE + \
+               "  38000: " + NEWLINE + \
+               "    mode:   active" + NEWLINE + \
+               "    power:  100 " + NEWLINE + \
+               "    pulse_length:   256" + NEWLINE + \
+               "  120000: " + NEWLINE + \
+               "    mode:   active" + NEWLINE + \
+               "   power:  100 " + NEWLINE + \
+               "pulse_length:   64" + NEWLINE + \
+               "  200000: " + NEWLINE + \
+               "    mode:   active" + NEWLINE +  \
+               "   power:  120 " + NEWLINE + \
+               "   pulse_length:   64"
 
 # Config file name to be stored on the instrument server
 ZPLSC_CONFIG_FILE_NAME = "zplsc_config.ymal"
 
-# newline.
-NEWLINE = '\r\n'
 
 # String constants
 CONNECTED = "connected"
@@ -756,9 +757,10 @@ class Protocol(CommandResponseInstrumentProtocol):
         #
         self._chunker = StringChunker(self.sieve_function)
 
-        schedule_file = self._create_schedule_file()
-        self._ftp_config_file(schedule_file, DEFAULT_YAML_FILE)
-        schedule_file.close()
+        #????????????????????????????????????????????????????
+        #schedule_file = self._create_schedule_file()
+        #self._ftp_config_file(schedule_file, DEFAULT_YAML_FILE)
+        #schedule_file.close()
 
 
     @staticmethod
@@ -789,6 +791,7 @@ class Protocol(CommandResponseInstrumentProtocol):
         and value formatting function for set commands.
         """
 
+        log.debug("_build_param_dict: Add SCHEDULE param to param_dict")
         self._param_dict.add(Parameter.SCHEDULE,
                              r'schedule:\s+(.*)',
                              lambda match : match.group(1),
@@ -800,6 +803,7 @@ class Protocol(CommandResponseInstrumentProtocol):
                              default_value = yaml.dump(DEFAULT_CONFIG, default_flow_style=False),
                              visibility=ParameterDictVisibility.READ_WRITE)
 
+        log.debug("_build_param_dict: Add FTP_IP_ADDRESS param to param_dict")
         self._param_dict.add(Parameter.FTP_IP_ADDRESS,
                              r'ftp address:\s+(\d\d\d\d\.\d\d\d\d\.\d\d\d\d\.\d\d\d)',
                              lambda match : match.group(1),
@@ -1432,7 +1436,7 @@ class Protocol(CommandResponseInstrumentProtocol):
     def _handler_discover(self, *args, **kwargs):
         """
         Discover current state
-        @retval (next_state, result)
+        @retval (next_state, next_agent_state)
         """
 
         next_state = ProtocolState.COMMAND
@@ -1464,6 +1468,7 @@ class Protocol(CommandResponseInstrumentProtocol):
             agent state changes happening with Get, so no next_agent_state
         @throw InstrumentParameterException for invalid parameter
         """
+
         next_state = None
         result = None
         result_vals = {}
@@ -1476,23 +1481,24 @@ class Protocol(CommandResponseInstrumentProtocol):
         except IndexError:
             raise InstrumentParameterException('_handler_command_get requires a parameter dict.')
 
-        if ((params == None) or (not isinstance(params, list))):
-            raise InstrumentParameterException("GET parameter list not a list!")
-
         if Parameter.ALL in params:
+            log.debug("Parameter ALL in params")
             params = Parameter.list()
             params.remove(Parameter.ALL)
 
-        #self._update_params()
+        log.debug("_handler_command_get: params = %s", params)
+
+        if ((params == None) or (not isinstance(params, list))):
+            raise InstrumentParameterException("GET parameter list not a list!")
 
         # fill the return values from the update
         for param in params:
             if not Parameter.has(param):
                 raise InstrumentParameterException("Invalid parameter!")
-            result_vals[param] = self._param_dict.get(param)
+            result_vals[param] = self._param_dict.get_config_value(param)
         result = result_vals
 
-        log.debug("Get finished, next: %s, result: %s", next_state, result)
+        log.debug("Get finished, next_state: %s, result: %s", next_state, result)
         return (next_state, result)
 
 
