@@ -12,6 +12,7 @@ USAGE:
        $ bin/test_driver -i [-t testname]
        $ bin/test_driver -q [-t testname]
 """
+import ftplib
 from mi.core.instrument.data_particle import RawDataParticle
 from mi.instrument.uw.bars.ooicore.driver import BarsDataParticleKey
 
@@ -19,6 +20,7 @@ __author__ = 'Richard Han'
 __license__ = 'Apache 2.0'
 
 import unittest
+import time
 
 from nose.plugins.attrib import attr
 from mock import Mock
@@ -69,36 +71,38 @@ InstrumentDriverTestCase.initialize(
     driver_startup_config = {
          DriverConfigKey.PARAMETERS : {
                 Parameter.FTP_IP_ADDRESS : '128.193.64.201',
-                Parameter.SCHEDULE : "# Default configuration file \
---- \
-file_prefix:    \"DEFAULT\" \
-file_path:      \"DEFAULT\" \
-max_file_size:   52428800 \
-intervals: \
-    name: \"default\" \
-    type: \"constant\" \
-    start_at:  \"00:00\" \
-    duration:  \"00:15:00\" \
-    repeat_every:   \"01:00\" \
-    stop_repeating_at: \"23:55\" \
-    interval:   1000 \
-    max_range:  80 \
-            frequency: \
-          38000: \
-              mode:   active \
-              power:  100 \
-              pulse_length:   256 \
-          120000: \
-              mode:   active \
-              power:  100 \
-              pulse_length:   64 \
-          200000: \
-              mode:   active \
-              power:  120 \
-              pulse_length:   64",
+                Parameter.SCHEDULE : "# Default schedule file" + NEWLINE + \
+                                     "---" + NEWLINE + \
+                                     "file_prefix:    \"DEFAULT\"" + NEWLINE + \
+                                     "file_path:      \"DEFAULT\"" + NEWLINE + \
+                                     "max_file_size:   52428800" + NEWLINE + \
+                                     "intervals: " + NEWLINE + \
+                                     "    -   name: \"default\"" + NEWLINE + \
+                                     "        type: \"constant\"" + NEWLINE + \
+                                     "        start_at:  \"00:00\"" + NEWLINE +  \
+                                     "        duration:  \"00:01:30\"" + NEWLINE + \
+                                     "        repeat_every:   \"00:10\"" + NEWLINE + \
+                                     "        stop_repeating_at: \"23:55\"" + NEWLINE +  \
+                                     "        interval:   1000" + NEWLINE + \
+                                     "        max_range:  220" + NEWLINE + \
+                                     "        frequency: " + NEWLINE + \
+                                     "          38000: " + NEWLINE + \
+                                     "              mode:   active" + NEWLINE + \
+                                     "              power:  100 " + NEWLINE + \
+                                     "              pulse_length:   256" + NEWLINE + \
+                                     "          120000: " + NEWLINE + \
+                                     "              mode:   active " + NEWLINE + \
+                                     "              power:  100 " + NEWLINE + \
+                                     "              pulse_length:   256" + NEWLINE + \
+                                     "          200000: " + NEWLINE + \
+                                     "              mode:   active " + NEWLINE + \
+                                     "              power:  120 " + NEWLINE + \
+                                     "              pulse_length:   256" + NEWLINE +
+                                     "...",
         }
     }
 )
+
 
 #################################### RULES ####################################
 #                                                                             #
@@ -135,6 +139,10 @@ class DriverTestMixinSub(DriverTestMixin):
     Mixin class used for storing data particle constants and common data assertion methods.
     """
 
+    FTP_IP_ADDRESS = "128.193.64.201"
+    USER_NAME = "ooi"
+    PASSWORD = "994ef22"
+
     InstrumentDriver = InstrumentDriver
     # Create some short names for the parameter test config
 
@@ -147,39 +155,40 @@ class DriverTestMixinSub(DriverTestMixin):
     DEFAULT = ParameterTestConfigKey.DEFAULT
     STATES = ParameterTestConfigKey.STATES
 
-    DEFAULT_SCHEDULE = DEFAULT_YAML = "# Default configuration file" + NEWLINE + \
-                                    "---" + NEWLINE + \
-                                    "file_prefix:    \"DEFAULT\"" + NEWLINE + \
-                                    "file_path:      \"DEFAULT\"" + NEWLINE + \
-                                    "max_file_size:   52428800" + NEWLINE + \
-                                    "intervals: " + NEWLINE + \
-                                    "    name: \"default\"" + NEWLINE + \
-                                    "    type: \"constant\"" + NEWLINE + \
-                                    "start_at:  \"00:00\"" + NEWLINE +  \
-                                    "duration:  \"00:15:00\"" + NEWLINE + \
-                                    "repeat_every:   \"01:00\"" + NEWLINE + \
-                                    "stop_repeating_at: \"23:55\"" + NEWLINE +  \
-                                    "interval:   1000" + NEWLINE + \
-                                    "max_range:  80" + NEWLINE + \
-                                    "frequency: " + NEWLINE + \
-                                    "   38000: " + NEWLINE + NEWLINE + \
-                                    "     mode:   active" + NEWLINE + \
-                                    "     power:  100 " + NEWLINE + \
-                                    "     pulse_length:   256" + NEWLINE + \
-                                    "   120000: " + NEWLINE + \
-                                    "     mode:   active " + NEWLINE + \
-                                    "     power:  100 " + NEWLINE + \
-                                    "     pulse_length:   64" + NEWLINE + \
-                                    "   200000: " + NEWLINE + \
-                                    "     mode:   active " + NEWLINE + \
-                                    "     power:  120 " + NEWLINE + \
-                                    "     pulse_length:   64"
+    DEFAULT_SCHEDULE = "# Default schedule file" + NEWLINE + \
+                       "---" + NEWLINE + \
+                       "file_prefix:    \"DEFAULT\"" + NEWLINE + \
+                       "file_path:      \"DEFAULT\"" + NEWLINE + \
+                       "max_file_size:   1228800" + NEWLINE + \
+                       "intervals: " + NEWLINE + \
+                       "    -   name: \"default\"" + NEWLINE + \
+                       "        type: \"constant\"" + NEWLINE + \
+                       "        start_at:  \"00:00\"" + NEWLINE +  \
+                       "        duration:  \"00:15:00\"" + NEWLINE + \
+                       "        repeat_every:   \"01:00\"" + NEWLINE + \
+                       "        stop_repeating_at: \"23:55\"" + NEWLINE +  \
+                       "        interval:   1000" + NEWLINE + \
+                       "        max_range:  80" + NEWLINE + \
+                       "        frequency: " + NEWLINE + \
+                       "          38000: " + NEWLINE + \
+                       "              mode:   active" + NEWLINE + \
+                       "              power:  100 " + NEWLINE + \
+                       "              pulse_length:   256" + NEWLINE + \
+                       "          120000: " + NEWLINE + \
+                       "              mode:   active " + NEWLINE + \
+                       "              power:  100 " + NEWLINE + \
+                       "              pulse_length:   64" + NEWLINE + \
+                       "          200000: " + NEWLINE + \
+                       "              mode:   active " + NEWLINE + \
+                       "              power:  120 " + NEWLINE + \
+                       "              pulse_length:   64" + NEWLINE + \
+                       "..."
 
 
     TEST_SCHEDULE =  "# QCT Example 5 configuration file" + NEWLINE + \
                      "---" + NEWLINE + \
                      "file_prefix:    \"OOI\"" + NEWLINE + \
-                     "file_path:      \"QCT_5\"         #relative to filesystem_root/data" + NEWLINE + \
+                     "file_path:      \"DEFAULT\"       #relative to filesystem_root/data" + NEWLINE + \
                      "max_file_size:   52428800       #50MB in bytes:  50 * 1024 * 1024" + NEWLINE + \
                      "" + NEWLINE + \
                      "intervals:" + NEWLINE + \
@@ -196,15 +205,16 @@ class DriverTestMixinSub(DriverTestMixin):
                      "     38000:" + NEWLINE + \
                      "         mode:   passive" + NEWLINE + \
                      "         power:  100" + NEWLINE + \
-                     "         pulse_length:   1024" + NEWLINE + \
+                     "         pulse_length:   256" + NEWLINE + \
                      "      120000:" + NEWLINE + \
                      "         mode:   active" + NEWLINE + \
                      "         power:  100" + NEWLINE + \
-                     "         pulse_length:   256" + NEWLINE + \
+                     "         pulse_length:   64" + NEWLINE + \
                      "     200000:" + NEWLINE + \
                      "         mode:   active"  + NEWLINE + \
                      "         power:  120" + NEWLINE + \
-                     "         pulse_length:   256"
+                     "         pulse_length:   64" + NEWLINE + \
+                     "..."
 
     INVALID_STATUS = "This is an invalid status; it had better cause an exception."
 
@@ -308,14 +318,32 @@ class DriverTestMixinSub(DriverTestMixin):
     }
 
     def assert_particle_sample(self, data_particle, verify_values=False):
-        '''
+        """
         Verify sample particle
         @param data_particle:  ZPLSCStatusParticle status particle
         @param verify_values:  bool, should we verify parameter values
-        '''
+        """
         self.assert_data_particle_keys(ZPLSCStatusParticleKey, self._sample_parameters)
         self.assert_data_particle_header(data_particle, DataParticleType.ZPLSC_STATUS, require_instrument_timestamp=False)
         self.assert_data_particle_parameters(data_particle, self._sample_parameters, verify_values)
+
+    def assert_status_particle(self, status_particle, verify_values=False):
+        """
+        Verify sample particle
+        @param data_particle:  ZPLSCDataParticle data particle
+        @param verify_values:  bool, should we verify parameter values
+        """
+        self.assert_data_particle_keys(ZPLSCStatusParticleKey, self._sample_parameters)
+        self.assert_data_particle_header(status_particle, DataParticleType.RAW, require_instrument_timestamp=False)
+        self.assert_data_particle_parameters(status_particle, self._sample_parameters, verify_values)
+
+    def assert_driver_parameters(self, current_parameters, verify_values=False):
+        """
+        Verify that all driver parameters are correct and potentially verify values.
+        @param current_parameters: driver parameters read from the driver instance
+        @param verify_values: should we verify values against definition?
+        """
+        self.assert_parameters(current_parameters, self._driver_parameters, verify_values)
 
 
 ###############################################################################
@@ -491,39 +519,125 @@ class DriverIntegrationTest(InstrumentDriverIntegrationTestCase, DriverTestMixin
         log.debug("reply = %s", reply)
         self.assert_driver_parameters(reply, True)
 
-        # verify we can set read/write parameters
-        self.assert_set(Parameter.FTP_IP_ADDRESS, "128.193.64.201")
+        # verify we can set FTP_IP_ADDRESS param
+        #self.assert_set(Parameter.FTP_IP_ADDRESS, "128.193.64.201")
 
-        # verify we can set read/write parameters
+        # verify we can set SCHEDULE param
         #self.assert_set(Parameter.SCHEDULE, DriverTestMixinSub.TEST_SCHEDULE)
 
 
-    def test_readonly_set(self):
-        # verify we cannot set read only parameters
-        self.assert_initialize_driver()
-        # self.assert_set_exception(Parameter.VERBOSE, VERBOSE_VALUE)
-        # self.assert_set_exception(Parameter.METADATA_POWERUP, METADATA_POWERUP_VALUE)
-        # self.assert_set_exception(Parameter.METADATA_RESTART, METADATA_RESTART_VALUE)
-        # self.assert_set_exception(Parameter.RES_SENSOR_POWER, RES_SENSOR_POWER_VALUE)
-        # self.assert_set_exception(Parameter.INST_AMP_POWER, INST_AMP_POWER_VALUE)
-        # self.assert_set_exception(Parameter.EH_ISOLATION_AMP_POWER, EH_ISOLATION_AMP_POWER_VALUE)
-        # self.assert_set_exception(Parameter.HYDROGEN_POWER, HYDROGEN_POWER_VALUE)
-        # self.assert_set_exception(Parameter.REFERENCE_TEMP_POWER, REFERENCE_TEMP_POWER_VALUE)
-
-
-    def test_get_params(self):
+    def test_set_params(self):
         """
         Test get driver parameters and verify their initial values.
         """
         self.assert_initialize_driver()
-        # self.assert_get(Parameter.CYCLE_TIME, CYCLE_TIME_VALUE)
-        # self.assert_get(Parameter.EH_ISOLATION_AMP_POWER, EH_ISOLATION_AMP_POWER_VALUE)
-        # self.assert_get(Parameter.HYDROGEN_POWER, HYDROGEN_POWER_VALUE)
-        # self.assert_get(Parameter.INST_AMP_POWER, INST_AMP_POWER_VALUE)
-        # self.assert_get(Parameter.METADATA_POWERUP, METADATA_POWERUP_VALUE)
-        # self.assert_get(Parameter.METADATA_RESTART, METADATA_RESTART_VALUE)
-        # self.assert_get(Parameter.REFERENCE_TEMP_POWER, REFERENCE_TEMP_POWER_VALUE)
-        # self.assert_get(Parameter.RES_SENSOR_POWER, RES_SENSOR_POWER_VALUE)
+
+        # verify we can set FTP_IP_ADDRESS param
+        self.assert_set(Parameter.FTP_IP_ADDRESS, "128.193.64.111")
+
+        # verify we can set SCHEDULE param
+        self.assert_set(Parameter.SCHEDULE, DriverTestMixinSub.TEST_SCHEDULE)
+
+    def test_acquire_status(self):
+        """
+        Test acquire status command which generates a status particle
+        """
+        self.assert_initialize_driver(ProtocolState.COMMAND)
+
+        # test acquire_status particles
+        self.assert_particle_generation(ProtocolEvent.ACQUIRE_STATUS,
+                                        DataParticleType.ZPLSC_STATUS,
+                                        self.assert_status_particle,
+                                        delay=10)
+
+    def ftp_remove_files(self, ftp_session):
+        """
+        Remove all files in the current directory
+        """
+
+        dir_files = ftp_session.nlst()
+
+        log.debug("nlst = %s",dir_files)
+        for file in dir_files:
+            ftp_session.delete(file)
+
+    def ftp_login(self):
+        try:
+            host = self.FTP_IP_ADDRESS
+            ftp_session = ftplib.FTP()
+            ftp_session.connect(host)
+            ftp_session.login(self.USER_NAME, self.PASSWORD,"")
+            log.debug("ftp session was created")
+            return ftp_session
+            #ftp_session.set_pasv(0)
+        except (ftplib.socket.error, ftplib.socket.gaierror), e:
+            log.error("ERROR: cannot reach FTP Host %s " % (host))
+            return
+
+
+    def test_autosample_on(self):
+        """
+        Test for turning auto sample data on
+        """
+        log.debug("Start test_autosample_on: ")
+
+        self.assert_initialize_driver(ProtocolState.COMMAND)
+        #response = self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.START_AUTOSAMPLE)
+
+        # try:
+        #     host = self.FTP_IP_ADDRESS
+        #     ftp_session = ftplib.FTP()
+        #     ftp_session.connect(host)
+        #     ftp_session.login(self.USER_NAME, self.PASSWORD,"")
+        #     log.debug("ftp session was created")
+        #     ftp_session.set_pasv(0)
+        # except (ftplib.socket.error, ftplib.socket.gaierror), e:
+        #     log.error("ERROR: cannot reach FTP Host %s " % (host))
+        #     return
+
+        ftp_session = self.ftp_login()
+
+        res = ftp_session.pwd()
+        log.debug(" current working dir  = %s", res)
+        ftp_session.cwd("/data/DEFAULT")
+        log.debug(" Change to DEFAULT directory = %s", res)
+
+        #Remove all existing raw files from The data/DEFAULT directory before starting autosample test
+        log.debug(" Remove all files in the DEFAULT directory")
+        self.ftp_remove_files(ftp_session)
+        ftp_session.quit()
+
+
+        log.debug("Start autosample")
+        response = self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.START_AUTOSAMPLE)
+
+        # time.sleep(800)
+        #
+        # log.debug(" Stop Autosample")
+        # response = self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.STOP_AUTOSAMPLE)
+        #
+
+        ftp_session = self.ftp_login()
+        res = ftp_session.pwd()
+        log.debug(" current working dir before = %s", res)
+        ftp_session.cwd("/data/DEFAULT")
+
+        res = ftp_session.pwd()
+        log.debug(" current working dir after = %s", res)
+
+        # Verify that raw files are generated in the /data/DEFAULT directory
+        entries = []
+        res = ftp_session.dir(entries.append)
+        log.debug("Default directory files")
+        if not entries:
+            log.debug("Default directory is empty")
+            self.fail("Autosample Failed: No raw files were generated")
+
+        for entry in entries:
+            log.debug("file generated = %s", entry)
+
+        ftp_session.quit()
+
 
 ###############################################################################
 #                            QUALIFICATION TESTS                              #
