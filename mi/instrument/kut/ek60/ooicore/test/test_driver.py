@@ -33,6 +33,7 @@ from mi.idk.unit_test import InstrumentDriverUnitTestCase
 from mi.idk.unit_test import InstrumentDriverIntegrationTestCase
 from mi.idk.unit_test import InstrumentDriverQualificationTestCase
 from mi.idk.unit_test import DriverTestMixin
+from mi.idk.unit_test import AgentCapabilityType
 
 from interface.objects import AgentCommand
 
@@ -56,6 +57,8 @@ from mi.instrument.kut.ek60.ooicore.driver import Parameter
 from mi.instrument.kut.ek60.ooicore.driver import Protocol
 from mi.instrument.kut.ek60.ooicore.driver import Prompt
 from mi.instrument.kut.ek60.ooicore.driver import NEWLINE
+
+from pyon.agent.agent import ResourceAgentState
 
 ###
 #   Driver parameters for the tests
@@ -97,7 +100,7 @@ InstrumentDriverTestCase.initialize(
                                      "          200000: " + NEWLINE + \
                                      "              mode:   active " + NEWLINE + \
                                      "              power:  120 " + NEWLINE + \
-                                     "              pulse_length:   256" + NEWLINE +
+                                     "              pulse_length:   256" + NEWLINE + \
                                      "...",
         }
     }
@@ -155,7 +158,39 @@ class DriverTestMixinSub(DriverTestMixin):
     DEFAULT = ParameterTestConfigKey.DEFAULT
     STATES = ParameterTestConfigKey.STATES
 
+    TEST_USER_NAME = "ooi_user"
+    TEST_USER_PASSWORD = "ooi_password"
+
     DEFAULT_SCHEDULE = "# Default schedule file" + NEWLINE + \
+                       "---" + NEWLINE + \
+                       "file_prefix:    \"DEFAULT\"" + NEWLINE + \
+                       "file_path:      \"DEFAULT\"" + NEWLINE + \
+                                     "max_file_size:   52428800" + NEWLINE + \
+                                     "intervals: " + NEWLINE + \
+                                     "    -   name: \"default\"" + NEWLINE + \
+                                     "        type: \"constant\"" + NEWLINE + \
+                                     "        start_at:  \"00:00\"" + NEWLINE +  \
+                                     "        duration:  \"00:01:30\"" + NEWLINE + \
+                                     "        repeat_every:   \"00:10\"" + NEWLINE + \
+                                     "        stop_repeating_at: \"23:55\"" + NEWLINE +  \
+                                     "        interval:   1000" + NEWLINE + \
+                                     "        max_range:  220" + NEWLINE + \
+                                     "        frequency: " + NEWLINE + \
+                                     "          38000: " + NEWLINE + \
+                                     "              mode:   active" + NEWLINE + \
+                                     "              power:  100 " + NEWLINE + \
+                                     "              pulse_length:   256" + NEWLINE + \
+                                     "          120000: " + NEWLINE + \
+                                     "              mode:   active " + NEWLINE + \
+                                     "              power:  100 " + NEWLINE + \
+                                     "              pulse_length:   256" + NEWLINE + \
+                                     "          200000: " + NEWLINE + \
+                                     "              mode:   active " + NEWLINE + \
+                                     "              power:  120 " + NEWLINE + \
+                                     "              pulse_length:   256" + NEWLINE + \
+                                     "..."
+
+    DEFAULT_SCHEDULE_2 = "# Default schedule file" + NEWLINE + \
                        "---" + NEWLINE + \
                        "file_prefix:    \"DEFAULT\"" + NEWLINE + \
                        "file_path:      \"DEFAULT\"" + NEWLINE + \
@@ -218,7 +253,22 @@ class DriverTestMixinSub(DriverTestMixin):
 
     INVALID_STATUS = "This is an invalid status; it had better cause an exception."
 
-    VALID_STATUS_01 = "{'connected': True," + NEWLINE + \
+    VALID_STATUS_03 = '{\"schedule_filename\": \"driver_schedule.yaml\", \"schedule\": {\"max_file_size\": 52428800, \"intervals\": [{\"max_range\": 220, \"start_at\": \"00:00\", \
+\"name\": \"default\", \"interval\": 1000, \"frequency\": {\"200000\": {\"bandwidth\": 10635, \"pulse_length\": 256, \"mode\": \"active\", \"power\": 120, \
+\"sample_interval\": 64}, \"38000\": {\"bandwidth\": 3675.35, \"pulse_length\": 256, \"mode\": \"active\", \"power\": 100, \"sample_interval\": 64}, \
+\"120000\": {\"bandwidth\": 8709.93, \"pulse_length\": 256, \"mode\": \"active\", \"power\": 100, \"sample_interval\": 64}}, \"duration\": \"00:01:30\", \
+\"stop_repeating_at\": \"23:55\", \"type\": \"constant\"}], \"file_path\": \"DEFAULT\", \"file_prefix\": \"DEFAULT\"}, \
+\"er60_channels\": {\"GPT 200 kHz 00907207b7b1 6-2 OOI38|200\": {\"pulse_length\": 0.000256, \"frequency\": 200000, \"sample_interval\": 6.4e-05, \
+\"power\": 120.0, \"mode\": \"active\"}, \"GPT 120 kHz 00907207b7dc 1-1 ES120-7CD\": {\"pulse_length\": 0.000256, \"frequency\": 120000, \"sample_interval\": 6.4e-05, \
+\"power\": 100.0, \"mode\": \"active\"}, \"GPT  38 kHz 00907207b7b1 6-1 OOI.38|200\": {\"pulse_length\": 0.000256, \"frequency\": 38000, \"sample_interval\": 6.4e-05, \
+\"power\": 100.0, \"mode\": \"active\"}}, \"gpts_enabled\": false, \"er60_status\": {\"executable\": \"c:/users/ooi/desktop/er60.lnk\", \"current_utc_time\": \"2014-07-28 21:38:01.756000\", \
+\"current_running_interval\": null, \"pid\": null, \"host\": \"157.237.15.100\", \"scheduled_intervals_remaining\": 144, \"next_scheduled_interval\": \"2014-07-28 00:00:00.000000\", \
+\"raw_output": {\"max_file_size\": 52428800, \"sample_range\": 220.0, \"file_prefix\": \"DEFAULT\", \"save_raw\": true, \"current_raw_filesize\": null, \"save_index\": true, \"save_bottom\": true, \
+\"current_raw_filename\": \"DEFAULT-D20140728-T171009.raw\", \"file_path\": \"D:\\\\data\\\\DEFAULT\"} \
+\"message\": \"ER60.exe successfully terminated:  SUCCESS: Sent termination signal to process with PID 2916, child of PID 2888.\", \"fs_root\": \"D:/\", \"port\": 52873}, \"connected\": false}'
+
+    VALID_STATUS_01 = '{"schedule_filename": "driver_schedule.yaml", "schedule": {"max_file_size": 52428800, "intervals": [{"max_range": 220, "start_at": "00:00", "name": "default", "interval": 1000, "frequency": {"200000": {"bandwidth": 10635, "pulse_length": 256, "mode": "active", "power": 120, "sample_interval": 64}, "38000": {"bandwidth": 3675.35, "pulse_length": 256, "mode": "active", "power": 100, "sample_interval": 64}, "120000": {"bandwidth": 8709.93, "pulse_length": 256, "mode": "active", "power": 100, "sample_interval": 64}}, "duration": "00:01:30", "stop_repeating_at": "23:55", "type": "constant"}], "file_path": "QCT_1", "file_prefix": "OOI"}, "er60_channels": {"GPT 200 kHz 00907207b7b1 6-2 OOI38|200": {"pulse_length": 0.000256, "frequency": 200000, "sample_interval": 6.4e-05, "power": 120.0, "mode": "active"}, "GPT 120 kHz 00907207b7dc 1-1 ES120-7CD": {"pulse_length": 0.000256, "frequency": 120000, "sample_interval": 6.4e-05, "power": 100.0, "mode": "active"}, "GPT  38 kHz 00907207b7b1 6-1 OOI.38|200": {"pulse_length": 0.000256, "frequency": 38000, "sample_interval": 6.4e-05, "power": 100.0, "mode": "active"}}, "gpts_enabled": false, "er60_status": {"executable": "c:/users/ooi/desktop/er60.lnk", "current_utc_time": "2014-07-29 15:49:11.789000", "current_running_interval": null, "pid": null, "host": "157.237.15.100", "scheduled_intervals_remaining": 144, "next_scheduled_interval": "2014-07-29 00:00:00.000000", "raw_output": {"max_file_size": 52428800, "sample_range": 220.0, "file_prefix": "OOI", "save_raw": true, "current_raw_filesize": null, "save_index": true, "save_bottom": true, "current_raw_filename": "DEFAULT-D20140728-T171009.raw", "file_path": "D:\\\\data\\\\QCT_1"}, "message": "ER60.exe successfully terminated:  SUCCESS: Sent termination signal to process with PID 2916, child of PID 2888.", "fs_root": "D:/", "port": 52873}, "connected": true}'
+    VALID_STATUS_02 = "{'connected': True," + NEWLINE + \
 "         'er60_channels': {'GPT  38 kHz 00907207b7b1 6-1 OOI.38|200': {'frequency': 38000," + NEWLINE + \
 "                                                                      'mode': 'active'," + NEWLINE + \
 "                                                                       'power': 100.0,"  + NEWLINE + \
@@ -277,7 +327,9 @@ class DriverTestMixinSub(DriverTestMixin):
         # Parameters defined in the IOS
 
         Parameter.SCHEDULE: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: DEFAULT_SCHEDULE, VALUE: DEFAULT_SCHEDULE},
-        Parameter.FTP_IP_ADDRESS: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: "128.193.64.201", VALUE: "128.193.64.201"},
+        Parameter.FTP_IP_ADDRESS: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: FTP_IP_ADDRESS, VALUE: FTP_IP_ADDRESS},
+        Parameter.FTP_USERNAME: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: USER_NAME, VALUE: USER_NAME},
+        Parameter.FTP_PASSWORD: {TYPE: str, READONLY: False, DA: False, STARTUP: True, DEFAULT: PASSWORD, VALUE: PASSWORD},
     }
 
 
@@ -285,24 +337,24 @@ class DriverTestMixinSub(DriverTestMixin):
         ZPLSCStatusParticleKey.ZPLSC_CONNECTED: {TYPE: bool, VALUE: True, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_MODE: {TYPE: unicode, VALUE: 'active', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_POWER: {TYPE: float, VALUE: 100.0, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_PULSE_LENGTH: {TYPE: float, VALUE: 6.4e-05, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 1.6e-05, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_PULSE_LENGTH: {TYPE: float, VALUE: 0.000256, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_120K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 6.4e-05, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_MODE: {TYPE: unicode, VALUE: 'active', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_POWER: {TYPE: float, VALUE: 120.0, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_PULSE_LENGTH: {TYPE: float, VALUE: 6.4e-05, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 1.6e-05, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_PULSE_LENGTH: {TYPE: float, VALUE: 0.000256, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_ACTIVE_200K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 6.4e-05, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_MODE: {TYPE: unicode, VALUE: 'active', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_POWER: {TYPE: float, VALUE: 100.0, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_PULSE_LENGTH: {TYPE: float, VALUE: 0.000256, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_ACTIVE_38K_SAMPLE_INTERVAL: {TYPE: float, VALUE: 6.4e-05, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_CURRENT_UTC_TIME: {TYPE: unicode, VALUE: '2014-07-09 01:23:39.691000', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_CURRENT_UTC_TIME: {TYPE: unicode, VALUE: '2014-07-29 15:49:11.789000', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_EXECUTABLE: {TYPE: unicode, VALUE: 'c:/users/ooi/desktop/er60.lnk', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_FS_ROOT: {TYPE: unicode, VALUE: 'D:/', REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_NEXT_SCHEDULED_INTERVAL: {TYPE: unicode, VALUE: 'None', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_NEXT_SCHEDULED_INTERVAL: {TYPE: unicode, VALUE: '2014-07-29 00:00:00.000000', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_HOST: {TYPE: unicode, VALUE: '157.237.15.100', REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_PID: {TYPE: int, VALUE: 1864, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_PORT: {TYPE: int, VALUE: 56635, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILENAME: {TYPE: unicode, VALUE: 'OOI-D20140707-T214500.raw', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_PID: {TYPE: int, VALUE: 0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_PORT: {TYPE: int, VALUE: 52873, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILENAME: {TYPE: unicode, VALUE: 'DEFAULT-D20140728-T171009.raw', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_CURRENT_RAW_FILESIZE: {TYPE: int, VALUE: 0, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_FILE_PATH: {TYPE: unicode, VALUE: 'D:\\data\\QCT_1', REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_FILE_PREFIX: {TYPE: unicode, VALUE: 'OOI', REQUIRED: True},
@@ -311,9 +363,9 @@ class DriverTestMixinSub(DriverTestMixin):
         ZPLSCStatusParticleKey.ZPLSC_SAVE_BOTTOM: {TYPE: bool, VALUE: True, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_SAVE_INDEX: {TYPE: bool, VALUE: True, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_SAVE_RAW: {TYPE: bool, VALUE: True, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_SCHEDULED_INTERVALS_REMAINING: {TYPE: int, VALUE: 0, REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SCHEDULED_INTERVALS_REMAINING: {TYPE: int, VALUE: 144, REQUIRED: True},
         ZPLSCStatusParticleKey.ZPLSC_GPTS_ENABLED: {TYPE: bool, VALUE: False, REQUIRED: True},
-        ZPLSCStatusParticleKey.ZPLSC_SCHEDULE_FILENAME: {TYPE: unicode, VALUE: 'qct_configuration_example_1.yaml', REQUIRED: True},
+        ZPLSCStatusParticleKey.ZPLSC_SCHEDULE_FILENAME: {TYPE: unicode, VALUE: 'driver_schedule.yaml', REQUIRED: True},
 
     }
 
@@ -461,6 +513,7 @@ class DriverUnitTest(InstrumentDriverUnitTestCase, DriverTestMixinSub):
 @attr('INT', group='mi')
 class DriverIntegrationTest(InstrumentDriverIntegrationTestCase, DriverTestMixinSub):
     def setUp(self):
+        time.sleep(30)
         InstrumentDriverIntegrationTestCase.setUp(self)
 
 
@@ -519,13 +572,6 @@ class DriverIntegrationTest(InstrumentDriverIntegrationTestCase, DriverTestMixin
         log.debug("reply = %s", reply)
         self.assert_driver_parameters(reply, True)
 
-        # verify we can set FTP_IP_ADDRESS param
-        #self.assert_set(Parameter.FTP_IP_ADDRESS, "128.193.64.201")
-
-        # verify we can set SCHEDULE param
-        #self.assert_set(Parameter.SCHEDULE, DriverTestMixinSub.TEST_SCHEDULE)
-
-
     def test_set_params(self):
         """
         Test get driver parameters and verify their initial values.
@@ -535,8 +581,16 @@ class DriverIntegrationTest(InstrumentDriverIntegrationTestCase, DriverTestMixin
         # verify we can set FTP_IP_ADDRESS param
         self.assert_set(Parameter.FTP_IP_ADDRESS, "128.193.64.111")
 
+        # Need to set the FTP IP address back to the working one so that
+        # the file transfer of a schedule file would work.
+        self.assert_set(Parameter.FTP_IP_ADDRESS, self.FTP_IP_ADDRESS)
+
         # verify we can set SCHEDULE param
         self.assert_set(Parameter.SCHEDULE, DriverTestMixinSub.TEST_SCHEDULE)
+
+        self.assert_set(Parameter.FTP_USERNAME, DriverTestMixinSub.TEST_USER_NAME)
+
+        self.assert_set(Parameter.FTP_PASSWORD, DriverTestMixinSub.TEST_USER_PASSWORD)
 
     def test_acquire_status(self):
         """
@@ -582,25 +636,12 @@ class DriverIntegrationTest(InstrumentDriverIntegrationTestCase, DriverTestMixin
         log.debug("Start test_autosample_on: ")
 
         self.assert_initialize_driver(ProtocolState.COMMAND)
-        #response = self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.START_AUTOSAMPLE)
-
-        # try:
-        #     host = self.FTP_IP_ADDRESS
-        #     ftp_session = ftplib.FTP()
-        #     ftp_session.connect(host)
-        #     ftp_session.login(self.USER_NAME, self.PASSWORD,"")
-        #     log.debug("ftp session was created")
-        #     ftp_session.set_pasv(0)
-        # except (ftplib.socket.error, ftplib.socket.gaierror), e:
-        #     log.error("ERROR: cannot reach FTP Host %s " % (host))
-        #     return
 
         ftp_session = self.ftp_login()
 
         res = ftp_session.pwd()
         log.debug(" current working dir  = %s", res)
         ftp_session.cwd("/data/DEFAULT")
-        log.debug(" Change to DEFAULT directory = %s", res)
 
         #Remove all existing raw files from The data/DEFAULT directory before starting autosample test
         log.debug(" Remove all files in the DEFAULT directory")
@@ -611,11 +652,10 @@ class DriverIntegrationTest(InstrumentDriverIntegrationTestCase, DriverTestMixin
         log.debug("Start autosample")
         response = self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.START_AUTOSAMPLE)
 
-        # time.sleep(800)
-        #
-        # log.debug(" Stop Autosample")
-        # response = self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.STOP_AUTOSAMPLE)
-        #
+        time.sleep(800)
+
+        log.debug(" Stop Autosample")
+        response = self.driver_client.cmd_dvr('execute_resource', ProtocolEvent.STOP_AUTOSAMPLE)
 
         ftp_session = self.ftp_login()
         res = ftp_session.pwd()
@@ -646,47 +686,134 @@ class DriverIntegrationTest(InstrumentDriverIntegrationTestCase, DriverTestMixin
 # be tackled after all unit and integration tests are complete                #
 ###############################################################################
 @attr('QUAL', group='mi')
-class DriverQualificationTest(InstrumentDriverQualificationTestCase):
+class DriverQualificationTest(InstrumentDriverQualificationTestCase, DriverTestMixinSub):
     def setUp(self):
+        time.sleep(50)
         InstrumentDriverQualificationTestCase.setUp(self)
 
     def test_direct_access_telnet_mode(self):
         """
         @brief This test manually tests that the Instrument Driver properly supports direct access to the physical instrument. (telnet mode)
         """
-        self.assert_direct_access_start_telnet()
+        self.assert_direct_access_start_telnet(timeout=1200)
         self.assertTrue(self.tcp_client)
-
-        ###
-        #   Add instrument specific code here.
-        ###
 
         self.assert_direct_access_stop_telnet()
 
+        # verify the setting got restored.
+        self.assert_get_parameter(Parameter.FTP_IP_ADDRESS, self.FTP_IP_ADDRESS)
+        self.assert_get_parameter(Parameter.FTP_USERNAME, self.USER_NAME)
+        self.assert_get_parameter(Parameter.FTP_PASSWORD, self.PASSWORD)
+        self.assert_get_parameter(Parameter.SCHEDULE, self.DEFAULT_SCHEDULE)
 
-    def test_poll(self):
-        '''
-        No polling for a single sample
-        '''
+
+    def test_discover(self):
+        """
+        over-ridden because the driver will always go to command mode
+        during the discover process after a reset.
+
+        """
+        # Verify the agent is in command mode
+        self.assert_enter_command_mode()
+
+        # Now reset and try to discover.  This will stop the driver and cause it to re-discover which
+        # will always go back to command for this instrument
+        self.assert_reset()
+        self.assert_discover(ResourceAgentState.COMMAND)
 
 
-    def test_autosample(self):
-        '''
-        start and stop autosample and verify data particle
-        '''
+    def test_status_particles(self):
+        """
+        Verify status particle in autosample state and in Command state
+        """
+
+        self.assert_enter_command_mode()
+
+        self.assert_particle_polled(Capability.ACQUIRE_STATUS, self.assert_status_particle,
+                                  DataParticleType.ZPLSC_STATUS,timeout=10)
 
 
     def test_get_set_parameters(self):
-        '''
-        verify that all parameters can be get set properly, this includes
-        ensuring that read only parameters fail on set.
-        '''
+        """
+        verify that all parameters can be get and set properly
+        """
         self.assert_enter_command_mode()
+
+        self.assert_get_parameter(Parameter.FTP_IP_ADDRESS, self.FTP_IP_ADDRESS)
+        self.assert_get_parameter(Parameter.SCHEDULE, self.DEFAULT_SCHEDULE)
+
+        self.assert_set_parameter(Parameter.FTP_IP_ADDRESS,  "128.193.68.215")
+        self.assert_set_parameter(Parameter.FTP_IP_ADDRESS, self.FTP_IP_ADDRESS)
+        self.assert_set_parameter(Parameter.SCHEDULE, self.TEST_SCHEDULE)
+
+        self.assert_set_parameter(Parameter.FTP_USERNAME, self.TEST_USER_NAME)
+        self.assert_set_parameter(Parameter.FTP_USERNAME, self.USER_NAME)
+
+        self.assert_set_parameter(Parameter.FTP_PASSWORD, self.TEST_USER_PASSWORD)
+        self.assert_set_parameter(Parameter.FTP_PASSWORD, self.PASSWORD)
+
+        self.assert_reset()
 
 
     def test_get_capabilities(self):
         """
-        @brief Walk through all driver protocol states and verify capabilities
-        returned by get_current_capabilities
+        @brief Verify that the correct capabilities are returned from get_capabilities
+        at various driver/agent states.
         """
+
         self.assert_enter_command_mode()
+
+        ##################
+        #  Command Mode
+        ##################
+
+        capabilities = {
+            AgentCapabilityType.AGENT_COMMAND: self._common_agent_commands(ResourceAgentState.COMMAND),
+            AgentCapabilityType.AGENT_PARAMETER: self._common_agent_parameters(),
+            AgentCapabilityType.RESOURCE_COMMAND: [
+                ProtocolEvent.GET,
+                ProtocolEvent.SET,
+                ProtocolEvent.START_AUTOSAMPLE,
+                ProtocolEvent.START_DIRECT,
+                ProtocolEvent.ACQUIRE_STATUS,
+            ],
+            AgentCapabilityType.RESOURCE_INTERFACE: None,
+            AgentCapabilityType.RESOURCE_PARAMETER: self._driver_parameters.keys()
+        }
+
+        self.assert_capabilities(capabilities)
+
+        ##################
+        #  Streaming Mode
+        ##################
+        capabilities[AgentCapabilityType.AGENT_COMMAND] = self._common_agent_commands(ResourceAgentState.STREAMING)
+        capabilities[AgentCapabilityType.RESOURCE_COMMAND] = [
+            ProtocolEvent.STOP_AUTOSAMPLE,
+        ]
+
+        self.assert_start_autosample()
+        self.assert_capabilities(capabilities)
+        self.assert_stop_autosample()
+
+        ##################
+        #  DA Mode
+        ##################
+        capabilities[AgentCapabilityType.AGENT_COMMAND] = self._common_agent_commands(ResourceAgentState.DIRECT_ACCESS)
+        capabilities[AgentCapabilityType.RESOURCE_COMMAND] = [
+            ProtocolEvent.STOP_DIRECT,
+            ProtocolEvent.EXECUTE_DIRECT,
+        ]
+        self.assert_direct_access_start_telnet()
+        self.assert_capabilities(capabilities)
+        self.assert_direct_access_stop_telnet()
+
+        #######################
+        #  Uninitialized Mode
+        #######################
+        capabilities[AgentCapabilityType.AGENT_COMMAND] = self._common_agent_commands(ResourceAgentState.UNINITIALIZED)
+        capabilities[AgentCapabilityType.RESOURCE_COMMAND] = []
+        capabilities[AgentCapabilityType.RESOURCE_INTERFACE] = []
+        capabilities[AgentCapabilityType.RESOURCE_PARAMETER] = []
+
+        self.assert_reset()
+        self.assert_capabilities(capabilities)
