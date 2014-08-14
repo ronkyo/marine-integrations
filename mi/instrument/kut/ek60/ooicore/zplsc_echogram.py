@@ -3,9 +3,12 @@
 @file marine-integrations/mi/instrument/kut/ek60/ooicore/driver.py
 @author Craig Risien
 @brief ZPLSC Echogram generation for the ooicore
+
 Release notes:
 
-This Class supports the generation of ZPLSC echograms.
+This Class supports the generation of ZPLSC echograms. It needs matplotlib version 1.3.1 for the code to display the
+colorbar at the bottom of the figure. If matplotlib version 1.1.1 is used, the colorbar would be plotted over the
+ figure instead of at the bottom of i.
 """
 
 __author__ = 'Craig Risien from OSU'
@@ -13,7 +16,8 @@ __license__ = 'Apache 2.0'
 
 from collections import defaultdict
 from modest_image import ModestImage, imshow
-import matplotlib
+
+# Need to install matplotlib version 1.3.1 for the colorbar to work correctly
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime
@@ -35,6 +39,9 @@ LENGTH_SIZE = 4
 DATAGRAM_HEADER_SIZE = 12
 CONFIG_HEADER_SIZE = 516
 CONFIG_TRANSDUCER_SIZE = 320
+TRANSDUCER_1 = 'Transducer # 1: '
+TRANSDUCER_2 = 'Transducer # 2: '
+TRANSDUCER_3 = 'Transducer # 3: '
 
 
 # set global regex expressions to find all sample, annotation and NMEA sentences
@@ -54,22 +61,25 @@ NMEA_MATCHER = re.compile(NMEA_REGEX, re.DOTALL)
 
 class ZPLSCEchogram():
     """
-    ZPLSC Echogram generation class
+    ZPLSC Echograms generation class
     """
 
     __metaclass__ = get_logging_metaclass(log_level='debug')
 
-    def __init__(self, raw_file):
+    def __init__(self, filepath, raw_file):
         """
-        ZPLSCEchogram constructor.
+        ZPLSCEchogram constructor
+        @param filepath directory path where generated echograms are stored
         @param raw_file ZPLSC raw binary file whose data is used to generate echograms
         """
+        self.filepath = filepath
         self.raw_file = raw_file
         if not self.raw_file.endswith('.raw'):
-            log.debug("ZPLSC raw file does not ")
+            log.debug("ZPLSC raw file does not end with dot raw ")
+
         # tuple contains the string before the '.', the '.' and the 'raw' string
         tuple = self.raw_file.rpartition('.')
-        self.outfile = tuple(0)
+        self.outfile = tuple[0]
 
 
     ####################################################################################
@@ -162,7 +172,7 @@ class ZPLSCEchogram():
         config_transducer[field_names[20]] = values[35]
         return config_transducer
 
-    def _read_text_data(self, chunk, name, string_length):
+    def _read_text_data(self, chunk, string_length):
         """
         Reads either the NMEA or annotation text strings from the EK60 raw data
         file from the byte string passed in as a chunk
@@ -307,16 +317,21 @@ class ZPLSCEchogram():
             plt.xlim(min_time, max_time)
 
             #plot the colorbar
-            cb = plt.colorbar(cax, orientation='vertical', ticks=cbar_ticks)
-            cb.ax.set_yticklabels(cbar_ticks, fontsize=8)  # vertically oriented colorbar
-            cb.set_label('db', fontsize=10)
+            cb = plt.colorbar(cax, orientation='horizontal', ticks=cbar_ticks, shrink=.6)
+            cb.ax.set_xticklabels(cbar_ticks, fontsize=8)  # horizontally oriented colorbar
+            cb.set_label('dB', fontsize=10)
+            cb.ax.set_xlim(-180, -60)
 
             plt.tight_layout()
             #adjust the subplot so that the x-tick labels will fit on the canvas
-            plt.subplots_adjust(bottom=0.2)
+            plt.subplots_adjust(bottom=0.1)
+
+            #reposition the cbar
+            cb.ax.set_position([.4, .05, .4, .1])
 
             #save the figure
             plt.savefig(filename, dpi=300)
+
             #close the figure
             plt.close()
 
@@ -458,11 +473,12 @@ class ZPLSCEchogram():
         ref_time = datetime(1970, 1, 1, 0, 0, 0)
         ref_time = mdates.date2num(ref_time)
 
+        filename = self.filepath + self.outfile
         if np.size(trans_array_1_time) > 0:
-            self._generate_plots(trans_array_1, trans_array_1_time, ref_time, td_1_f, td_1_dR, 'Transducer # 1: ', self.outfile + '_38k.png')
+            self._generate_plots(trans_array_1, trans_array_1_time, ref_time, td_1_f, td_1_dR, TRANSDUCER_1, filename + '_38k.png')
 
         if np.size(trans_array_2_time) > 0:
-            self._generate_plots(trans_array_2, trans_array_2_time, ref_time, td_2_f, td_2_dR, 'Transducer # 2: ', self.outfile + '_120k.png')
+            self._generate_plots(trans_array_2, trans_array_2_time, ref_time, td_2_f, td_2_dR, TRANSDUCER_2, filename + '_120k.png')
 
         if np.size(trans_array_3_time) > 0:
-            self._generate_plots(trans_array_3, trans_array_3_time, ref_time, td_3_f, td_3_dR, 'Transducer # 3: ', self.outfile + '_200k.png')
+            self._generate_plots(trans_array_3, trans_array_3_time, ref_time, td_3_f, td_3_dR, TRANSDUCER_3, filename + '_200k.png')
