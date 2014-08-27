@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime
 
-
+import os
 import re
 import numpy as np
 import pprint as pp
@@ -66,19 +66,21 @@ class ZPLSCEchogram():
 
     __metaclass__ = get_logging_metaclass(log_level='debug')
 
-    def __init__(self, filepath, raw_file):
+    def __init__(self, out_filepath, raw_file):
         """
         ZPLSCEchogram constructor
-        @param filepath directory path where generated echograms are stored
+        @param out_filepath directory path where generated echograms are stored
         @param raw_file ZPLSC raw binary file whose data is used to generate echograms
         """
-        self.filepath = filepath
+        self.out_filepath = out_filepath
         self.raw_file = raw_file
         if not self.raw_file.endswith('.raw'):
             log.debug("ZPLSC raw file does not end with dot raw ")
 
+        (filepath, filename) = os.path.split(self.raw_file)
+
         # tuple contains the string before the '.', the '.' and the 'raw' string
-        tuple = self.raw_file.rpartition('.')
+        tuple = filename.rpartition('.')
         self.outfile = tuple[0]
 
 
@@ -473,7 +475,7 @@ class ZPLSCEchogram():
         ref_time = datetime(1970, 1, 1, 0, 0, 0)
         ref_time = mdates.date2num(ref_time)
 
-        filename = self.filepath + self.outfile
+        filename = self.out_filepath + '/' + self.outfile
         if np.size(trans_array_1_time) > 0:
             self._generate_plots(trans_array_1, trans_array_1_time, ref_time, td_1_f, td_1_dR, TRANSDUCER_1, filename + '_38k.png')
 
